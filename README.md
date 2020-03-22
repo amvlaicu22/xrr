@@ -1,6 +1,6 @@
 # X-ray Reflectivity 
-#   from thin film multilayer structures
-#   using Parrat algorythm 
+   from thin film multilayer structures
+   using Parrat algorythm 
 Vlaicu Aurel-Mihai amvlaicu22@yahoo.com 
 
 xrr.py 	: console program \
