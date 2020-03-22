@@ -1,2 +1,12 @@
-# xrr
-X-Ray Reflectivity from thin films multilayer structures
+# X-ray Reflectivity from thin films multilayer structures
+# Vlaicu Aurel-Mihai
+# amvlaicu22@yahoo.com
+# using Parrat algorythm
+# 
+# xrr.py 	: console program
+# Cromer.py 	: atomic scattering factors
+# xrr_qt.py 	: pyQT5 GUI
+# xrr_wx.py 	: wx GUI
+# xrr_wxg.py	: glade generated py
+# xrr_wxg.wxg 	: glade file for wx GUI
+# where.py  	: position of executed code
