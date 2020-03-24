@@ -355,35 +355,19 @@ class QMainFrame(QMainWindow):
 
         
     def layer_plot(self):
-        cv = self.p0
-        fg = self.p0.fig
-        ax = self.p0.axes
-        
-        fg.clear() 
-        
-        axs = fg.subplots(2, 1, sharex=True)
-        
-        for a, p_c in zip(self.xrr.atoms, self.xrr.atomp):
-            axs[0].plot(self.xrr.p_z, p_c, label=a)
-        # ~ axs[0].legend()
-        axs[0].legend(loc=2, bbox_to_anchor=(1.05, 1.0), ncol=1, fontsize=8, title='Atoms')
-        # ~ .draggable()  
-        # Adjust the scaling factor to fit your legend text completely outside the plot
-        # (smaller value results in more space being made for the legend)
-        
-        axs[0].grid(True)
-        axs[0].set_ylabel(r'$comp. index$')
-        
-        axs[1].plot(self.xrr.p_z, self.xrr.p_rh, c='r', label=r'$profile $')
-        axs[1].plot(self.xrr.p_z, self.xrr.p_rL, c='k', label=r'$layer $')
-        axs[1].legend(loc=2, bbox_to_anchor=(0.75, 1.0), ncol=1, fontsize=8, title=r'$\rho \ [g/cm^3]$')
-        # ~ .draggable()
-        axs[1].grid(True)
-        axs[1].set_xlabel(r'$z \ [\AA]$')
-        axs[1].set_ylabel(r'$\rho \ [g/cm^3]$')
-
-        fg.subplots_adjust(right=0.85)
-        cv.draw()
+        cnv = self.p0
+        fig = self.p0.fig
+        axs = self.p0.axes        
+        fig.clear() 
+        axs = fig.subplots(2, 1, sharex=True)
+        fig.subplots_adjust(right=0.85)
+        ax = 1.02
+        ay = 1.1
+        drag = True
+        self.xrr.plot3(axs[0], ax, ay, drag)
+        self.xrr.plot4(axs[1], ax, ay, drag)
+        fig.tight_layout()
+        cnv.draw()
 
     def layer_load(self):
         # ~ alert = QMessageBox()
@@ -447,70 +431,43 @@ class QMainFrame(QMainWindow):
         # ~ files, _ = QFileDialog.getOpenFileNames(self,"QFileDialog.getOpenFileNames()", "","All Files (*);;Python Files (*.py)", options=options)
         # ~ if files:
             # ~ print(files)
-    
-    
-    
-        
         
     def data_plot1(self):
-        fg = self.p1.fig
-        ax = self.p1.axes
-        
-        ax.clear()
-        # ~ ax = pg.figure.add_subplot(111)
-        # ~ ax = pg.figure.gca(projection = '3d') 
-        
-        ax.plot(self.xrr.mx, self.xrr.my, label='$meas.$', c='k')
-        ax.plot(self.xrr.xx, self.xrr.yy, label='$meas.''$', c='g')
-        ax.plot(self.xrr.xx, self.xrr.rr1, label='$calc.$', c='r')
-        
-        ax.legend(loc=2, bbox_to_anchor=(0.75, 1.0), ncol=1, fontsize=8, title=r'$XRR$')
-        # ~ ax.legend.set_draggable()
-        ax.grid(True)
-        ax.set_xlabel(r'$2 \theta \ [deg]$')  # raw string r'jfkejrf' or use '$\\theta \\rho$
-        ax.set_ylabel(r'$int = R^2$')
-        ax.set_yscale('log')
-        fg.tight_layout()
-        # ~ plt.show()
-        self.p1.draw()
+        cnv = self.p1
+        fig = self.p1.fig
+        axs = self.p1.axes
+        axs.clear()
+        fig.subplots_adjust(right=0.85)
+        ancx = 1.02
+        ancy = 1.1
+        drag = True
+        self.xrr.plot1(axs, ancx, ancy, drag)
+        cnv.draw()
         
     def data_plot2(self):
-        cv = self.p2
-        fg = self.p2.fig
-        ax = self.p2.axes
-        
-        ax.clear()
-        # ~ ax = pg.figure.add_subplot(111)
-        # ~ ax = pg.figure.gca(projection = '3d') 
-        
-        ax.plot(self.xrr.qq, self.xrr.yq4, label='$meas.$', c='g')
-        ax.plot(self.xrr.qq, self.xrr.r1q4, label='$calc.$', c='r')
-        ax.legend(loc=2, bbox_to_anchor=(0.75, 1.0), ncol=1, fontsize=8, title=r'$R^2\ Q^4$')   #.draggable()
-        # ~ ax.legend.set_draggable()
-        ax.grid(True)
-        # ~ ax.set_xlabel(r'$2 \theta \ [deg]$')  # raw string r'jfkejrf' or use '$\\theta \\rho$
-        ax.set_xlabel(r'$ Q=2\pi/d = 4\pi \ sin(\theta)/ \lambda) \ [1/\AA]$')
-        ax.set_ylabel(r'$R^2\ Q^4$')
-        ax.set_yscale('log')
-        # ~ ax.set_xscale('log')
-        fg.tight_layout()
-        cv.draw()
+        cnv = self.p2
+        fig = self.p2.fig
+        axs = self.p2.axes
+        axs.clear()
+        fig.subplots_adjust(right=0.85)
+        ancx = 1.02
+        ancy = 1.1
+        drag = True
+        self.xrr.plot2(axs, ancx, ancy, drag)
+        cnv.draw()
         
     def data_plot3(self):
-        cv = self.p3
-        fg = self.p3.fig
-        ax = self.p3.axes
-        ax.clear() 
+        cnv = self.p3
+        fig = self.p3.fig
+        axs = self.p3.axes
+        axs.clear() 
         y = self.xrr.ferr    
         n = len(y)
         x = [i for i in range(n)]   
-        ax.plot(x, y)
-        ax.set_yscale('log')
-        fg.tight_layout()
-        cv.draw()
-        # ~ print("data_plot3() n = ", n)
-        # ~ print(x)
-        # ~ print(y)
+        axs.plot(x, y)
+        axs.set_yscale('log')
+        fig.tight_layout()
+        cnv.draw()
     
 
     def QB(self, label, tip='tooltip', hsize=140, vsize=25, func=None): #, signal='clicked()'):
@@ -532,40 +489,44 @@ class QMainFrame(QMainWindow):
         self.setCentralWidget(F)
         F.setLayout(L)
 
-        L0 = QHBoxLayout()
-        L0.addWidget(QLabel('Multi-Layers'))
-        L0.addWidget(self.QB( 'load', func = self.layer_load))
-        L0.addWidget(self.QB( 'save', func = self.layer_save))
-        F0 = QFrame()
-        F0.setLayout(L0)
-        
-        L1 = QHBoxLayout()
-        L1.addWidget(self.QB( 'insert', func = self.layer_ins) )
-        L1.addWidget(self.QB( 'delete', func = self.layer_del) )
-        L1.addWidget(self.QB( 'update', func = self.layer_update) )
-        F1 = QFrame()
-        F1.setLayout(L1)
-        
-        L2 = QVBoxLayout()
-        self.t1 = MyTableWidget(self)
-        L2.addWidget(self.t1)
-        F2 = QFrame()
-        F2.setLayout(L2)
-
-        
-        L3 = QHBoxLayout()
-        L3.addWidget(QLabel('Data') )
-        L3.addWidget(self.QB('load', func = self.data_load) )
+        L0_0 = QHBoxLayout()
+        L0_0.addWidget(QLabel('Data') )
+        L0_0.addWidget(self.QB('load', func = self.data_load) )
         self.e1 = QLineEdit();           
-        L3.addWidget(self.e1)
-        F3 = QFrame()
-        F3.setLayout(L3)
+        L0_0.addWidget(self.e1)
+        F0_0 = QFrame()
+        F0_0.setLayout(L0_0)
 
-        L4 = QHBoxLayout()
+
+        L0_1 = QHBoxLayout()
+        L0_1.addWidget(QLabel('Multi-Layers'))
+        L0_1.addWidget(self.QB( 'load', func = self.layer_load))
+        L0_1.addWidget(self.QB( 'save', func = self.layer_save))
+        F0_1 = QFrame()
+        F0_1.setLayout(L0_1)
+        
+        L1_0 = QVBoxLayout()
+        self.tb = MyTabWidget()
+        L1_0.addWidget(self.tb)
+        F1_0 = QFrame()
+        F1_0.setLayout(L1_0)
+        self.p1 = self.tb.cnv1
+        self.p2 = self.tb.cnv2
+        self.p0 = self.tb.cnv3
+
+
+        L1_1 = QVBoxLayout()
+        self.t1 = MyTableWidget(self)
+        L1_1.addWidget(self.t1)
+        F1_1 = QFrame()
+        F1_1.setLayout(L1_1)
+
+
+        L2_0 = QHBoxLayout()
         self.b1 = self.QB( 'Fit', func = self.OnStart)
         self.b2 = self.QB( 'stop', func = self.OnStop)
-        L4.addWidget(self.b1)
-        L4.addWidget(self.b2)
+        L2_0.addWidget(self.b1)
+        L2_0.addWidget(self.b2)
         self.r1 = QRadioButton('L-M');  self.r1.setChecked(True);   
         self.r2 = QRadioButton('D-E');  self.r2.setChecked(False); 
         self.z1 = self.QB('0');    self.z1.resize(100, 20)
@@ -581,49 +542,51 @@ class QMainFrame(QMainWindow):
         self.c2 = QCheckBox('dd');      self.c2.setChecked(True)
         self.c3 = QCheckBox('sg');      self.c3.setChecked(True)
         self.c4 = QCheckBox('rh');      self.c4.setChecked(True)
-        L4.addWidget(self.r1)  
-        L4.addWidget(self.r2)
-        L4.addWidget(self.z1)
-        L4.addWidget(self.x1)
-        L4.addWidget(self.c1)
-        L4.addWidget(self.c2)
-        L4.addWidget(self.c3)
-        L4.addWidget(self.c4)
-        F4 = QFrame()
-        F4.setLayout(L4)
+        L2_0.addWidget(self.r1)  
+        L2_0.addWidget(self.r2)
+        L2_0.addWidget(self.z1)
+        L2_0.addWidget(self.x1)
+        L2_0.addWidget(self.c1)
+        L2_0.addWidget(self.c2)
+        L2_0.addWidget(self.c3)
+        L2_0.addWidget(self.c4)
+        F2_0 = QFrame()
+        F2_0.setLayout(L2_0)
         
-        
-        L5 = QVBoxLayout()
-        self.tb = MyTabWidget()
-        L5.addWidget(self.tb)
-        F5 = QFrame()
-        F5.setLayout(L5)
-        self.p1 = self.tb.c1
-        self.p2 = self.tb.c2
 
+
+
+        L2_1 = QHBoxLayout()
+        L2_1.addWidget(self.QB( 'insert', func = self.layer_ins) )
+        L2_1.addWidget(self.QB( 'delete', func = self.layer_del) )
+        L2_1.addWidget(self.QB( 'update', func = self.layer_update) )
+        F2_1 = QFrame()
+        F2_1.setLayout(L2_1)
         
-        L6 = QHBoxLayout()
-        # ~ L6 = QGridLayout()
-        self.p3 = PlotCanvas(self, title='fitting error', width=1)
-        L6.addWidget(self.p3)
+        L3_1 = QHBoxLayout()
+        self.p3 = PlotCanvas(self, title='fitting error', width=3, height=1)
+        self.p3.fig.tight_layout()
+
+        L3_1.addWidget(self.p3)
+        F3_1 = QFrame()
+        F3_1.setLayout(L3_1)
+
+        L4_1 = QHBoxLayout()
         self.tx = QTextEdit()       
-        L6.addWidget(self.tx)
-        F6 = QFrame()
-        F6.setLayout(L6)
-
-        L7 = QVBoxLayout()
-        self.p0 = PlotCanvas(self, title='profile')
-        L7.addWidget(self.p0)
-        F7 = QFrame()
-        F7.setLayout(L7)
+        L4_1.addWidget(self.tx)
+        F4_1 = QFrame()
+        F4_1.setLayout(L4_1)
       
-        L.addWidget(F3, *(0, 0));       L.addWidget(F0, *(0, 1))
-        L.addWidget(F5, *(1, 0));       L.addWidget(F7, *(1, 1))
-        L.addWidget(F4, *(2, 0));       L.addWidget(F1, *(2, 1))
-        L.addWidget(F6, *(3, 0));       L.addWidget(F2, *(3, 1))
-
+        L.addWidget(F0_0, *(0, 0))
+        L.addWidget(F2_0, *(1, 0))             
+        L.addWidget(F1_0, *(2, 0))
+        L.addWidget(F3_1, *(3, 0))
+            
+        L.addWidget(F0_1, *(0, 1))
+        L.addWidget(F2_1, *(1, 1))
+        L.addWidget(F1_1, *(2, 1))
+        L.addWidget(F4_1, *(3, 1))
         
-       
         
     def Menu(self):
         mainMenu = self.menuBar()
@@ -659,9 +622,14 @@ class PlotCanvas(FigureCanvas):
         FigureCanvas.setSizePolicy(self,    QSizePolicy.Expanding,      QSizePolicy.Expanding)
         FigureCanvas.updateGeometry(self)
         
+        
 
 
 
+# ~ from matplotlib.backends.backend_qt4agg import FigureCanvasQTAgg as FigureCanvas
+# ~ from matplotlib.backends.backend_qt4 import NavigationToolbar2QT as NavigationToolbar
+from matplotlib.backends.backend_qt5 import NavigationToolbar2QT as NavigationToolbar
+# ~ from matplotlib.backends.backend_wxagg import NavigationToolbar2WxAgg as NavigationToolbar
 
 class MyTabWidget(QWidget):
     
@@ -673,6 +641,7 @@ class MyTabWidget(QWidget):
         # ~ # Initialize tab screen
         self.tabs = QTabWidget()
         self.tabs.resize(300,200)
+        self.tabs.setTabPosition(2)
         
         # ~ # Add tabs to widget
         self.layout = QVBoxLayout(self)
@@ -682,20 +651,34 @@ class MyTabWidget(QWidget):
         # ~ # Add tabs
         self.tab1 = QWidget()
         self.tab2 = QWidget()
-        self.tabs.addTab(self.tab1,"int vs 2theta")
-        self.tabs.addTab(self.tab2," I*Q^4 vs Q")
+        self.tab3 = QWidget()
+        self.tabs.addTab(self.tab1,"I vs 2theta")
+        self.tabs.addTab(self.tab2,"I*Q^4 vs Q")
+        self.tabs.addTab(self.tab3,"Layer profile")
         
         # ~ # Create first tab
-        self.c1 = PlotCanvas(self, title='c1')
-        self.tab1.layout = QVBoxLayout(self)
-        self.tab1.layout.addWidget(self.c1)
-        self.tab1.setLayout(self.tab1.layout)
+        self.cnv1 = PlotCanvas(self, title='c1')
+        self.nav1 = NavigationToolbar(self.cnv1, self)
+        self.lay1 = QVBoxLayout(self)
+        self.lay1.addWidget(self.cnv1)
+        self.lay1.addWidget(self.nav1)
+        self.tab1.setLayout(self.lay1)
         
         # ~ # Create second tab
-        self.c2 = PlotCanvas(self, title='c2')
-        self.tab2.layout = QVBoxLayout(self)
-        self.tab2.layout.addWidget(self.c2)
-        self.tab2.setLayout(self.tab2.layout)
+        self.cnv2 = PlotCanvas(self, title='c2')
+        self.nav2 = NavigationToolbar(self.cnv2, self) 
+        self.lay2 = QVBoxLayout(self)
+        self.lay2.addWidget(self.cnv2)
+        self.lay2.addWidget(self.nav2)
+        self.tab2.setLayout(self.lay2)
+
+        # ~ # Create third tab
+        self.cnv3 = PlotCanvas(self, title='c2')
+        self.nav3 = NavigationToolbar(self.cnv3, self) 
+        self.lay3 = QVBoxLayout(self)
+        self.lay3.addWidget(self.cnv3)
+        self.lay3.addWidget(self.nav3)
+        self.tab3.setLayout(self.lay3)
         
 
 class MyTableWidget(QTableWidget):

@@ -1,32 +1,5 @@
-from __future__ import print_function
-from threading import *
-from PyQt5.QtCore import QThread, QObject, pyqtSignal, pyqtSlot
 import wx
-
 import sys
-# ~ print("Hello world!", flush=True)
-# ~ On Python 2 you'll have to do
-# ~ import sys
-# ~ sys.stdout.flush()
-
-# ~ if sys.version_info[:2] < (3, 3):
-    # ~ old_print = print
-    # ~ def print(*args, **kwargs):
-        # ~ flush = kwargs.pop('flush', False)
-        # ~ old_print(*args, **kwargs)
-        # ~ if flush:
-            # ~ file = kwargs.get('file', sys.stdout)
-            # ~ # Why might file=None? IDK, but it works for print(i, file=None)
-            # ~ file.flush() if file is not None else sys.stdout.flush()
-
-import functools
-print = functools.partial(print, flush=True)
-
-# ~ Changing the default for the process
-# ~ I think the best option here is to use the -u flag to get unbuffered output.
-# ~ $ python -u script.py
-# ~ or
-# ~ $ python -um package.module
 
 import time
 import numpy as np
@@ -35,12 +8,10 @@ from scipy.optimize import curve_fit
 from scipy.optimize import minimize
 from scipy.optimize import differential_evolution
 
-
 import matplotlib.pyplot as plt
 import CromerMan
 from CromerMan import Cromer
 from where import where
-
 
 class _PhysConst:
     _wl_A = 1.54     #//A Cu Ka1
@@ -63,10 +34,6 @@ class _PhysConst:
         self._keV = keV
         self._wl_A = self._hc/keV*10.0
         return self._wl_A
-
-
-
-
 
 class _XLayer:
     _name = ""
@@ -157,78 +124,51 @@ class _XLayer:
         self._keV = self._hc/self._wlA*10.0
         
     def f_SF(self, qq, keV):
+        # ~ input is "Atom name", Q = 2*pi/d=4*pi*sin(theta)/Lambda [A^-1], and energy in keV
+        # ~ returns Complex f0+fp + i* fpp   in [electron units]        
         self.f_keV(keV)
-        # ~ asfwv       = np.array(qq, dtype=np.complex_)   # scattering factor for one atom
-        for atm, NA in zip(self.AtomS, self.AtomN):
-            # ~ asfwv = np.array(qq, dtype=np.complex_)
+        for atm, AN in zip(self.AtomS, self.AtomN):
             f0 = Cromer()._f0Q(atm, qq)
             fp = Cromer()._fpE(atm, keV)
-            # ~ asfwv = [ (f0i + fp[0]) + fp[1]*1j for f0i in f0]
             asfwv = f0 + fp[0] + fp[1]*1j 
             self.SFa.append(asfwv)
-            self.SF += asfwv*NA
-            # ~ sfwv[] = get_f(atm, qq[p], keV) 
-            # ~ Get_f(AtomType, Q, keV)             
-            # ~ returns Complex f0+fp + i* fpp   in [electron units]        
-            # ~ input is "Atom name", Q = 2*pi/d=4*pi*sin(theta)/Lambda [A^-1], and energy in keV
-        
+            self.SF += asfwv*AN
+            
     def f_SLD(self):
-        # ~ LQ_sld[][]  += re*Na*1E-14*L_rh[p]/L_MM[p]*LA_cmp[p][k]*atmsfwv[q] 
-        # ~ LA_cmp[p][k]*atmsfwv[q] = layer_SF
-        # for each layer
-        # ~ LQ_sld[][]  = re*1E-14*(Na*L_rh[p]/L_MM[p])*LQ_SF[p][q]
         self.SLD = self._re*1.0E-14*(self._Na*self._rh/self._Mm)*self.SF
     
     def f_comp2chem(self):
-        # ~ print(self._name, self._comp)
-        if self._comp == "":
-            return
         self.AtomS = []
         self.AtomN = []
+        if self._comp == "":
+            return
         chemlist = blank_strip(self._comp).split(';')
-        # ~ print(chemlist)
         self.AtomS = chemlist[0::2]
-        # ~ print(self.AtomS)
         atomNs = np.asarray(chemlist[1::2])
-        # ~ print(atomNs)
         self.AtomN = atomNs.astype(np.float)
-        # ~ print(self.AtomN)
         self.ntot = sum(i for i in self.AtomN)
         AtomM = []
         for atom in self.AtomS:
             mm = _MolarMass().mm(atom)
             AtomM.append( mm )
-            # ~ print(atom, mm)
         self.AtomM = np.asarray(AtomM)
-        # ~ print(self.AtomM)
         self._Mm = sum(i for i in self.AtomM*self.AtomN)
-        # ~ print(self._Mm)
-        # ~ print self.AtomM
-        # ~ print self._M
         Vm_cm3 = self._Mm/self._rh/self._Na #//(g/mol)/(g/cm^3)/(1/mol) = cm^3
         Vm_A3  = Vm_cm3*1.0e24 #//A^3
         self._Vm = Vm_A3
-        # ~ print(self._Vm)
-
+        
     
     def __header__(self):
-        return    "_____________________________________________________________________\n"\
-                + "Name      Chemical Composition   d [A] s [A]  [g/cm^3] [g/mol]  [A^3]  \n" \
-                + "_____________________________________________________________________" 
-    def __tail__(self):
+        return    "Name    | Chemical Composition | d_[A]| s_[A]|[g/cm^3]|[g/mol]| [A^3]"
+                 
+    def __line__(self):
         return    "_____________________________________________________________________"
         
         
     def __str__(self):
-        s = ""
-        s += '{0:8s}'.format(self._name)+'  '
-        s += '{0:12s}'.format(self._comp)+'  '
-        s += '{0:4.1f}'.format(self._dd)+'   '
-        s += '{0:4.1f}'.format(self._sg)+'  '
-        s += '{0:7.4f}'.format(self._rh)+'  '
-        s += '{0:5.1f}'.format(self._Mm)+'  '
-        s += '{0:7.1f}'.format(self._Vm)+'  '
-        return s
+        t =  f"{self._name:5s}  {self._comp:12s}  {self._dd:4.1f}  {self._sg:4.1f}  {self._rh:7.4f}  "
+        t += f"{self._Mm:5.1f}  {self._Vm:7.1f}"
+        return t
 
 
     
@@ -276,21 +216,16 @@ class XRR():
     perr = []
     ferr = []
     
-    
+    whrn = 3
         
     def __init__(self):
         super().__init__()
-        where("", 2)
-        # ~ print('>> xrr.py >> ')
-        # ~ print('XRR() class')
-        # ~ print('\t __init__()')
+        where("", self.whrn)
         self.fitkeys = [ 'ab', 'dd', 'rh', 'sg']
         self.fitmode = 0
         self.fitmax = 100
         self.abort = 0
         self.fitn = 0
-        # ~ self.gui = None
-        # ~ self.evt = { 1:wx.NewId(), 0:wx.NewId(), -1:wx.NewId() }
         
         self._a0 = 1.0 #//scale  
         self._b0_m = 1.0 # bgnd mantisse
@@ -302,7 +237,7 @@ class XRR():
         self.xrr_str()
         # ~ self.data_load('xrr_test.dat')
         self.data = self.data_str
-        self.data_parse()   # ~ >>  mx, my
+        self.data_parse()   # ~ >>  mx, my "measured data": delete data points < _2tht0
         self.data_init()   # >> xx, yy, qq, qq4, yq4, rr0, rr1, r0q4, r1q4, ryq4
         
         # ~ self.layer_load('xrr_test.xrr')
@@ -344,8 +279,7 @@ class XRR():
             self.layer += l
             
     def layer_parse(self):
-        where("", 2)
-        # ~ print('\t XRR.layer_parse()')
+        where("", self.whrn)
         self.LL = []
         for line in self.layer.splitlines():
             if line[0] != '#' :
@@ -355,15 +289,16 @@ class XRR():
         return
     
     def layer_print(self):
+        print( _XLayer().__line__() )
         print( _XLayer().__header__() )
+        print( _XLayer().__line__() )
         for  L in self.LL: 
             print( L )
-        print( _XLayer().__tail__() )
+        print( _XLayer().__line__() )
         
     
     def layer_init(self):
-        where("", 2)
-        # ~ print('\t XRR.layer_init()') 
+        where("", self.whrn)
         for  L in self.LL: 
             L.f_comp2chem()
             L.f_qwaves(self.qq)
@@ -382,8 +317,7 @@ class XRR():
 
             
     def data_parse(self):
-        where("", 2)
-        # ~ print('\t XRR.data_parse()')
+        where("", self.whrn)
         xx, yy = [], []
         for line in self.data.splitlines():
             vx, vy = line.split()
@@ -393,8 +327,7 @@ class XRR():
         self.my = np.asarray(yy)
         
     def data_init(self):
-        where("", 2)
-        # ~ print('\t XRR.data_init()')
+        where("", self.whrn)
         self.xx = self.mx.copy()
         self.yy = self.my.copy()
 
@@ -415,7 +348,6 @@ class XRR():
         
         self.yq4 = self.yy.copy()
         self.yq4 = self.yy * self.qq4
-        # ~ self.yq4 = np.log10(self.yy*self.qq4)
         
         self.rr0 = self.yy.copy()  # without scale and background
         self.rr0 = self.yy*0.8
@@ -437,71 +369,84 @@ class XRR():
         
     def plot(self):
         fig, axs = plt.subplots(2, 2)
-        fig.subplots_adjust(right=0.85)
         ax1 = axs[0][0]
         ax2 = axs[1][0]
         ax3 = axs[0][1]
         ax4 = axs[1][1]
+        # Adjust the scaling factor to fit your legend text completely outside the plot
+        # (smaller value results in more space being made for the legend)
+        fig.subplots_adjust(right=0.98)
+        ax = 1.02
+        ay = 1.1
+        drag = True
+        self.plot1(ax1, ax, ay, drag)
+        self.plot2(ax2, ax, ay, drag)
+        self.plot3(ax3, ax, ay, drag)
+        self.plot4(ax4, ax, ay, drag)
+        plt.tight_layout()
+        plt.show()
+        return
+
+        # ~ ax = pg.figure.add_subplot(111)
+        # ~ ax = pg.figure.gca(projection = '3d') 
         
-        ax1.plot(self.mx, self.my, label='meas.')
-        # ~ ax1.plot(self.xx, self.yy, label='yy')
-        ax1.plot(self.xx, self.rr1, label='calc.')
-        ax1.legend(loc=2, bbox_to_anchor=(0.75, 1.0), ncol=1, fontsize=8, title='')
-        # ~ .draggable()
-        ax1.grid(True)
-        ax1.set_xlabel(r'$2 \theta \ [deg]$')  # raw string r'jfkejrf' or use '$\\theta \\rho$
-        ax1.set_ylabel(r'$I/I_{max}$')
-        ax1.set_yscale('log')
-        
+        # ~ axes = plt.gca()
+        # ~ axes.set_xlim([xmin,xmax])
+        # ~ axes.set_ylim([ymin,ymax])
+
         # ~ ticks = np.arange(0., 8.1, 2.)
         # ~ tickLb = ['%1.2f' % tick for tick in ticks] # list comprehension to get all tick labels...
         # ~ ax1.xaxis.set_ticks(ticks)
         # ~ ax2.xaxis.set_ticks(ticks)
         # ~ ax2.xaxis.set_ticklabels(tickLb)
         # ~ ax2.set_xlim(ax1.get_xlim())
+        # ~ plot(x, y, 'go--', linewidth=2, markersize=12)
+        # ~ plot(x, y, color='green', marker='o', linestyle='dashed', linewidth=2, markersize=12)
         
-        ax2.plot(self.qq, self.yq4, label='meas.')
-        ax2.plot(self.qq, self.r1q4, label='calc.')
+    def plot1(self, ax1, ax, ay, drag):
+        ax1.plot(self.mx, self.my, label='$meas.$', c='k')
+        ax1.plot(self.xx, self.yy, label='$meas.''$', c='g', linewidth=1.5)
+        ax1.plot(self.xx, self.rr1, label='$calc.$', c='r', linewidth=1.5)
+        ax1.legend(loc=2, bbox_to_anchor=(ax, ay), ncol=1, fontsize=8, title='').draggable(drag)
+        ax1.grid(True)
+        ax1.set_xlabel(r'$2 \theta \ [deg]$')  # raw string r'jfkejrf' or use '$\\theta \\rho$
+        ax1.set_ylabel(r'$I/I_{max}$')
+        ax1.set_yscale('log')
+
+        
+    def plot2(self, ax2, ax, ay, drag):
+        ax2.plot(self.qq, self.yq4, label='meas.', c='g', linewidth=1.5)
+        ax2.plot(self.qq, self.r1q4, label='calc.', c='r', linewidth=1.5)
         for L in self.LL:
-            ax2.plot(self.qq, abs(L.R2*L.Q**4), label=L._name)
-        # ~ ax2.legend()
-        ax2.legend(loc=2, bbox_to_anchor=(0.75, 1.0), ncol=1, fontsize=8, title=r'$R^2Q^4$')
-        # ~ .draggable()  
+            ax2.plot(self.qq, abs(L.R2*L.Q**4), label=L._name, linewidth=0.75)
+        ax2.legend(loc=2, bbox_to_anchor=(ax, ay), ncol=1, fontsize=8, title=r'$R^2Q^4$').draggable(drag)  
         ax2.grid(True)
         ax2.set_yscale('log')
         ax2.set_xlabel(r'$Q=4 \pi \ sin(\theta)/ \lambda \ [1/ \AA]$')
         ax2.set_ylabel(r'$int*\ Q^4$')
         ax2.set_ylim([min(self.yq4)/5., max(self.yq4)*5.])
-        
-        # ~ axes = plt.gca()
-        # ~ axes.set_xlim([xmin,xmax])
-        # ~ axes.set_ylim([ymin,ymax])
-        
-        
 
+        
+        
+    def plot3(self, ax3, ax, ay, drag):
         ax3.plot(self.p_z, self.p_rh, c='r', label=r'$profile $')
         ax3.plot(self.p_z, self.p_rL, c='k', label=r'$layer $')
-        ax3.legend(loc=2, bbox_to_anchor=(0.75, 1.0), ncol=1, fontsize=8, title=r'$\rho \ [g/cm^3]$')
-        # ~ .draggable()
+        ax3.legend(loc=2, bbox_to_anchor=(ax, ay), ncol=1, fontsize=8, title=r'$\rho \ [g/cm^3]$').draggable(drag)
         ax3.grid(True)
         ax3.set_ylabel(r'$\rho \ [g/cm^3]$')
-        
+        ax3.set_xlabel(r'$z \ [\AA]$')
+
+    def plot4(self, ax4, ax, ay, drag):
         for a, p_c in zip(self.atoms, self.atomp):
             ax4.plot(self.p_z, p_c, label=a)
-        ax4.legend(loc=2, bbox_to_anchor=(0.75, 1.0), ncol=1, fontsize=8, title=r'$atoms$')
-        # ~ .draggable()
+        ax4.legend(loc=2, bbox_to_anchor=(ax, ay), ncol=1, fontsize=8, title=r'$atoms$').draggable(drag)
         ax4.grid(True)
         ax4.set_ylabel(r'$comp. index$')
         ax4.set_xlabel(r'$z \ [\AA]$')
-        
-        plt.tight_layout()
-        plt.show()
-        return
-    
 
        
     def layer_to_fitparam(self):
-        where("", 2)
+        where("", self.whrn)
         self.pfit = []
         self.pkey = []
         def keyadd( key, idx): 
@@ -580,22 +525,22 @@ class XRR():
     #================================
         for key, value in dictionary.items():
             print(f"{key} = {value}")
-            print("________________________________________________")
+            # ~ print("________________________________________________")
                 
     def post_event(self, **kw):
     #=================================
-        # ~ m = {0:'L-M', 1:'D-E'}
-        # ~ d = {'@':'XRR', 'fit':m[self.fitmode], 'fitn' : self.fitn}
         # ~ d = {'fitn':self.fitn, 'err':"{0:.1e}".format(self.fiterr)}
         d = {'fitn':self.fitn, 'err':f"{self.fiterr:.2e}" }
         d.update(kw)    # add more key:values from **kw
+        # ~ m = {0:'L-M', 1:'D-E'}
+        # ~ n = {'@':'XRR', 'fit':m[self.fitmode]}
+        # ~ d.update(n)
         where(f"\n>>{d}",1)
-        # ~ print(d)
     
 
     def fit(self):
     #========================
-        where("", 2)
+        where("", self.whrn)
         # ~ print('\t XRR.fit()')
 
         # ~ def zero(): self.r1q4[:] = 0.1
@@ -729,8 +674,7 @@ class XRR():
 
 
     def xrr(self):
-        # ~ where("",2)
-        # print('\t XRR.xrr()' )
+        # ~ where("",3)
         nL = len(self.LL)
         nq = len(self.qq)
         nf = nL -1
@@ -778,117 +722,8 @@ class XRR():
         return self.r1q4
         
         
-        '''
-        From IgorPro
-        ===============
-        Vm_cm3 = MMol/dens/Na   //(g/mol)/(g/cm^3)/(1/mol) = cm^3
-        Vm_A3  = Vm_cm3*1E24 //A^3
-
-        for layers
-        for each layer [i] we have [k] atom[k] and natm[k] from L_comp[i]
-          sf0[] = get_f(atom[k], qq[p], keV)  //sf0(q), q = vector
-          sf[i][] += natm[k]*sf0[q]           //sf(q)(layer)
-
-          re_Vm_A2        = re*1E10/Vm_A3
-          sld[i][] = re_Vm_A2*sf[i][q]        // 1/um^2
-
-              variable prefix,delta, betha
-              prefix = Na*re*wl_A*wl_A/2.0/pi*1E-20
-              delta = prefix*real(layer_fp)
-              betha = prefix*imag(layer_fp)
-
-        SLD = (rho_m*Na)*sum_i(ci*bi)/sum_i(ci*Mi)
-        
-        bi = re*(f1_i + i*f2_i) = re*fp_i
-        fp = f1+i*f2
-        Vm = M/Na/rho_m
-        SLD = (re/Vm)*fp
-        
-        re = 2.8179403e-15 //m
-        Na Avogadro 6.0221 x 10^23 // 1/mol
-        M molar mass [g/mol]
-        rho_m [g/cm^3]
-        
-        n = 1 - delta -i*betha
-        
-        delta = (wl^2/2pi)*(re*rho_m*Na/M)f1 = (wl^2/2pi)*Real(SLD)
-        betha = (wl^2/2pi)*(re*rho_m*Na/M)f2 = (wl^2/2pi)*Real(SLD)
-        
-        =====================================
-        function xrr(pw, yw, qq):FitFunc
-        =====================================
-            WAVE pw, yw, qq     // pw=fit parameter wave, yw = xrr.y, qq=4*pi*sin(tht)/wl
-            
-            WAVE L_dd, L_sg, L_rh, L_MM     //thick, sigma, dens, molar mass
-            variable i,j,k
-            variable nL = dimsize(L_dd,0)
-            variable nq = dimsize(qq,0)
-            variable nf = nL-1
-
-            L_dd[] = pw[p]
-            L_sg[] = pw[p+nL]
-            L_rh[] = pw[p+nL*2]
-            NVAR a0, b0
-            a0 = abs(pw[3*nL])
-            b0 = abs(pw[3*nL+1])
-
-            NVAR re, Na, wl_A
-            string sfwvstr
-            WAVE /T atom_sfwv
-            WAVE LA_cmp
-            WAVE /c LQ_sld, LQ_SF
-
-            LQ_sld[][]  = re*1E-14*(Na*L_rh[p]/L_MM[p])*LQ_SF[p][q]
-
-            //  LQ_SLD = 0
-            //  variable natm = dimsize(atom_sfwv,0)
-            //  for (k=0; k<natm; k=k+1)
-            //      WAVE /c atmsfwv = $(atom_sfwv[k])   
-            //      LQ_sld[][]  += re*Na*1E-14*L_rh[p]/L_MM[p]*LA_cmp[p][k]*atmsfwv[q]  
-            //  endfor
-            
-            WAVE /c LQ_kk, LQ_fr, LQ_bt, LQ_rr  //wave-vector k, fresnel, betha, reflectivity
-
-            LQ_kk[][] = sqrt(qq[q]*qq[q]/4.0 - 4.0*pi*(LQ_sld[p][q]-LQ_sld[nf][q]))
-            //kk[0] = qq/2.0
-            
-            LQ_fr[0][] = cmplx(1,1)
-            WAVE /c Q_phase, Q_attn, Q_fresnel
-            for (i=1; i<nL; i=i+1)
-                Q_phase[] = LQ_kk[i][p]*LQ_kk[i-1][p]*L_sg[i-1]*L_sg[i-1]
-                Q_attn[] = exp(-Q_phase[p])
-                Q_fresnel[] = (LQ_kk[i][p] - LQ_kk[i-1][p])/(LQ_kk[i][p]+LQ_kk[i-1][p])
-                LQ_fr[i][] = Q_fresnel[q] * Q_attn[q]
-            endfor
-            variable /c ii = cmplx(0,1)
-            
-            // nq, nL
-            LQ_bt[][]   = exp(-2*ii*LQ_kk[p][q]*L_dd[p])
-            LQ_bt[0][] = 1
-            LQ_bt[nf][] = 1
-            
-            LQ_rr = 0 
-            for (i=1; i<nL; i=i+1)
-                LQ_rr[i][] = LQ_bt[i][q]*(LQ_rr[i-1][q]+LQ_fr[i][q])/(1+LQ_rr[i-1][q]*LQ_fr[i][q])
-            endfor
-
-            WAVE refl0
-            refl0 = magsqr(LQ_rr[nf][p])
-            WAVE refl1
-            refl1 = abs(a0)*refl0+abs(b0)
-            WAVE qq4, R0q4, R1q4
-            R0q4 = log(qq4*refl0)
-            R1q4 = log(qq4*refl1)
-            yw = R1Q4
-
-        end //function
-        '''
-
-
-    
- 
     def layer_profile(self):
-        where(f"{self.fitn}",2)
+        where("",self.whrn)
         # ~ print('\t XRR.layer_profile(), fitn=', self.fitn)
 
         from mpmath import erf
@@ -979,18 +814,18 @@ class XRR():
         self.atomp = atomp
         
     def xrr_str(self):
-        where("",2)
+        where("",self.whrn)
         # ~ print('\t XRR.xrr_str()')
         self.layer_str = \
 """# name , chem_comp , thickness_[A] , roughness_[A] , density_[g/cm^3] 
-glass    ,   Si;1;O;2              , 0.0 , 6.13 , 3.52 
-NoName   ,   Si;0.1;O;0.5;C;0.4    , 12.77 , 3.43 , 0.003 
-W        ,   W;1                   , 42.36 , 3.87 , 20.16 
-W-Si-O   ,   W;0.6;Si;0.3;O;0.1    , 7.82 , 3.90 , 10.17 
-NoName  ,   Si;0.1;O;0.5;C;0.4  , 7.47 , 5.59 , 0.0014 
-Si       ,   Si;1                  , 62.96 , 35.62 , 1.48 
-SiO2     ,   Si;1;O;2              , 14.99 , 4.82 , 3.36 
-air      ,   N;1.5;O;0.5           , 0.0 , 0.0 , 0.0012  """
+glass    , Si;1;O;2           ,  0.00 ,  6.13 ,  3.5200 
+NoName   , Si;0.1;O;0.5;C;0.4 , 12.77 ,  3.43 ,  0.0030 
+W        , W;1                , 42.36 ,  3.87 , 20.1600 
+W-Si-O   , W;0.6;Si;0.3;O;0.1 ,  7.82 ,  3.90 , 10.1700 
+NoName   , Si;0.1;O;0.5;C;0.4 ,  7.47 ,  5.59 ,  0.0014 
+Si       , Si;1               , 62.96 , 35.62 ,  1.4800 
+SiO2     , Si;1;O;2           , 14.99 ,  4.82 ,  3.3600 
+air      , N;1.5;O;0.5        ,  0.00 ,  0.00 ,  0.0012"""
 
         self.data_str = \
 """	-0.1	0.003532061

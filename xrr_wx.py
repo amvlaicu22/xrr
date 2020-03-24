@@ -133,8 +133,23 @@ class Plot_Panel(wx.Panel):
         self.toolbar.Realize()
 
         sizer = wx.BoxSizer(wx.VERTICAL)
+        # ~ sizer = wx.BoxSizer(wx.HORIZONTAL)
         sizer.Add(self.canvas, 1, wx.EXPAND)
         sizer.Add(self.toolbar, 0, wx.LEFT | wx.EXPAND)
+        self.SetSizer(sizer)
+        
+class Plot_Panel0(wx.Panel):
+    def __init__(self, parent, id=-1, dpi=None, **kwargs):
+        wx.Panel.__init__(self, parent, id=id, **kwargs)  
+        self.figure = mpl.figure.Figure(dpi=dpi)    #, figsize=(2, 2)
+        self.canvas = FigureCanvas(self, -1, self.figure)
+        # ~ self.toolbar = NavigationToolbar(self.canvas)
+        # ~ self.toolbar.Realize()
+
+        sizer = wx.BoxSizer(wx.VERTICAL)
+        # ~ sizer = wx.BoxSizer(wx.HORIZONTAL)
+        sizer.Add(self.canvas, 1, wx.EXPAND)
+        # ~ sizer.Add(self.toolbar, 0, wx.LEFT | wx.EXPAND)
         self.SetSizer(sizer)
 
 
@@ -183,14 +198,15 @@ class MainFrame(XRR_Frame):
         self.panel_1.SetSizer(sizer)
         self.plotter1.add('Int vs 2tht')
         self.plotter1.add('Int*Q^4 vs Q')
+        self.plotter1.add('Layer profile')
         self.data_plot1()
         self.data_plot2()
         
-        self.plotter2 = Plot_Notebook(self.panel_2)
-        sizer = wx.BoxSizer(wx.VERTICAL)
-        sizer.Add(self.plotter2, -1, wx.ALL|wx.EXPAND, 5)
-        self.panel_2.SetSizer(sizer)
-        self.plotter2.add('Z profile')
+        self.plot3 = Plot_Panel0(self.panel_2)
+        self.plot3.figure.add_subplot(111)
+        sizer3_ = wx.BoxSizer(wx.VERTICAL)
+        sizer3_.Add(self.plot3, -1, wx.ALL|wx.EXPAND, 5)
+        self.panel_2.SetSizer(sizer3_)
         
         # ~ self.xrr.layer_profile()
         self.layer_plot()
@@ -254,6 +270,7 @@ class MainFrame(XRR_Frame):
         # ~ self.layer_plot()
         self.data_plot1()
         self.data_plot2()
+        self.data_plot3()
             
     def OnEvt_xrr_end(self, event):
         print( '@', event.name, '<<', event.data, )
@@ -283,92 +300,67 @@ class MainFrame(XRR_Frame):
         
     # ~ def plot_profile(self):
     def layer_plot(self):
-
-        pg = self.plotter2.pagelist[0]
-        fg = pg.figure
-        cv = pg.canvas
-        ax = pg.figure.gca()
-        
-        fg.clear()
-        # ~ ax = pg.figure.add_subplot(111)
-        # ~ ax = pg.figure.gca(projection = '3d') 
-        
-        axs = fg.subplots(2, 1, sharex=True)
-        
-        for a, p_c in zip(self.xrr.atoms, self.xrr.atomp):
-            axs[0].plot(self.xrr.p_z, p_c, label=a)
-        # ~ axs[0].legend()
-        axs[0].legend(loc=2, bbox_to_anchor=(1.05, 1.0), ncol=1, fontsize=8, title='Atoms')
-        # ~ .draggable()  
-        # Adjust the scaling factor to fit your legend text completely outside the plot
-        # (smaller value results in more space being made for the legend)
-        
-        axs[0].grid(True)
-        axs[0].set_ylabel(r'$comp. index$')
-        
-        axs[1].plot(self.xrr.p_z, self.xrr.p_rh, c='r', label=r'$profile $')
-        axs[1].plot(self.xrr.p_z, self.xrr.p_rL, c='k', label=r'$layer $')
-        axs[1].legend(loc=2, bbox_to_anchor=(0.75, 1.0), ncol=1, fontsize=8, title=r'$\rho \ [g/cm^3]$')
-        # ~ .draggable()
-        axs[1].grid(True)
-        axs[1].set_xlabel(r'$z \ [\AA]$')
-        axs[1].set_ylabel(r'$\rho \ [g/cm^3]$')
-        
-        fg.subplots_adjust(right=0.85)
-        
-        cv.draw()
-
+        pg = self.plotter1.pagelist[2]
+        fig = pg.figure
+        cnv = pg.canvas
+        axs = pg.figure.gca()
+        fig.clear()
+        axs = fig.subplots(2, 1, sharex=True)
+        fig.subplots_adjust(right=0.85)
+        ax = 1.02
+        ay = 1.1
+        drag = True
+        self.xrr.plot3(axs[0], ax, ay, drag)
+        self.xrr.plot4(axs[1], ax, ay, drag)
+        # ~ fig.tight_layout()
+        cnv.draw()
         
         
-        
-    # ~ def plot_Int_vs_2tht(self):
     def data_plot1(self):
         pg = self.plotter1.pagelist[0]
-        fg = pg.figure
-        cv = pg.canvas
-        ax = pg.figure.gca()
+        fig = pg.figure
+        cnv = pg.canvas
+        axs = pg.figure.gca()
+        axs.clear()
+        fig.subplots_adjust(right=0.85)
+        ancx = 1.02
+        ancy = 1.1
+        drag = True
+        self.xrr.plot1(axs, ancx, ancy, drag)
+        cnv.draw()
         
-        ax.clear()
-        # ~ ax = pg.figure.add_subplot(111)
-        # ~ ax = pg.figure.gca(projection = '3d') 
         
-        ax.plot(self.xrr.mx, self.xrr.my, label='$meas.$', c='k')
-        ax.plot(self.xrr.xx, self.xrr.yy, label='$meas.''$', c='g')
-        ax.plot(self.xrr.xx, self.xrr.rr1, label='$calc.$', c='r')
-        
-        ax.legend(loc=2, bbox_to_anchor=(0.75, 1.0), ncol=1, fontsize=8, title=r'$XRR$')
-        # ~ ax.legend.set_draggable()
-        ax.grid(True)
-        ax.set_xlabel(r'$2 \theta \ [deg]$')  # raw string r'jfkejrf' or use '$\\theta \\rho$
-        ax.set_ylabel(r'$int = R^2$')
-        ax.set_yscale('log')
-        fg.tight_layout()
-        # ~ plt.show()
-        cv.draw()
-        
-    # ~ def plot_IQ4_vs_Q(self):
     def data_plot2(self):
         pg = self.plotter1.pagelist[1]
-        fg = pg.figure
-        cv = pg.canvas
-        ax = pg.figure.gca()
+        fig = pg.figure
+        cnv = pg.canvas
+        axs = pg.figure.gca()
         
-        ax.clear()
-        # ~ ax = pg.figure.add_subplot(111)
-        # ~ ax = pg.figure.gca(projection = '3d') 
+        axs.clear()
+        fig.subplots_adjust(right=0.85)
+        ancx = 1.02
+        ancy = 1.1
+        drag = True
+        self.xrr.plot2(axs, ancx, ancy, drag)
+        cnv.draw()
         
-        ax.plot(self.xrr.qq, self.xrr.yq4, label='$meas.$', c='g')
-        ax.plot(self.xrr.qq, self.xrr.r1q4, label='$calc.$', c='r')
-        ax.legend(loc=2, bbox_to_anchor=(0.75, 1.0), ncol=1, fontsize=8, title=r'$R^2\ Q^4$')   #.draggable()
-        # ~ ax.legend.set_draggable()
-        ax.grid(True)
-        # ~ ax.set_xlabel(r'$2 \theta \ [deg]$')  # raw string r'jfkejrf' or use '$\\theta \\rho$
-        ax.set_xlabel(r'$ Q=2\pi/d = 4\pi \ sin(\theta)/ \lambda) \ [1/\AA]$')
-        ax.set_ylabel(r'$R^2\ Q^4$')
-        ax.set_yscale('log')
-        # ~ ax.set_xscale('log')
-        fg.tight_layout()
-        cv.draw()
+    def data_plot3(self):
+        # ~ where()
+        cnv = self.plot3.canvas
+        fig = self.plot3.figure
+        axs = fig.add_subplot(111)
+        # ~ axs = fig.gca()
+        axs.clear() 
+        
+        y = self.xrr.ferr    
+        n = len(y)
+        x = [i for i in range(n)]   
+        axs.plot(x, y)
+        axs.set_yscale('log')
+        fig.tight_layout()
+        cnv.draw()
+
+        
 
 
     def layer_to_grid(self):
