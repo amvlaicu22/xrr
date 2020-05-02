@@ -1,35 +1,115 @@
-import wx
+#!/usr/bin/python3
+import CromerLiberman
+from CromerLiberman import Cromer
+
+# ~ import wx
 import sys
 
 import time
 import numpy as np
+import cmath
 import scipy
 from scipy.optimize import curve_fit
 from scipy.optimize import minimize
 from scipy.optimize import differential_evolution
 
 import matplotlib.pyplot as plt
-import CromerMan
-from CromerMan import Cromer
-from where import where
+import threading
+from threading import Thread
+
+pystr="""
+     Y
+/\/\(:)
+\/\/\/
+"""
+
+class Panel_Plot():
+    def __init__(self, parent=None, id=-1, dpi=None, figsize=(3,2), 
+        tbar = 0, row=1, col=1, fplots=[]):
+        import matplotlib.pyplot as plt
+        plt.ion()
+        # ~ self.fig = plt.figure(figsize=(3,2))
+        # ~ self.cvs = self.fig.canvas
+        # ~ self.axs = self.fig.add_subplot(111)
+        self.row = row
+        self.col = col
+        self.plt = fplots
+        self.fig, self.axs = plt.subplots(row, col)
+        self.fig.subplots_adjust(right=0.98)
+        # ~ # Adjust the scaling factor to fit your legend text completely outside the plot
+        # ~ # (smaller value results in more space being made for the legend)
+    def plot(self):
+        axs = np.asarray(self.axs)
+        for fplot, axs in zip(self.plt, axs.flat): fplot(axs)
+        self.draw()
+    def draw(self):
+        self.fig.tight_layout()
+        self.fig.canvas.draw()
+        self.fig.canvas.flush_events()
+        # ~ plt.show()
+
+# ~ from where import *
+# ~ from icecream import ic
+# ~ import q
+
+
+
+from math import atan
+def step_atan_math(x0, y1, y2, sg, x):
+    return np.array( [ (y2 - y1)*(np.pi/2.0 + atan( (xi - x0)/(sg/2.0/np.pi)) )/(np.pi) for xi in x ] )
+
+def step_atan_np(x0, y1, y2, sg, x):
+    return np.array( [ (y2 - y1)*(np.pi/2.0 + np.arctan( (xi - x0)/(sg/np.pi/2)) )/(np.pi) for xi in x ])
+
+from mpmath import erf
+def step_erf0(x0, y1, y2, sg, x):   # for a single value
+    return (y2 - y1)*(1. + erf( (x - x0)/sg) )/2.
+
+def step_erf(x0, y1, y2, sg, x):
+    return np.array( [ (y2 - y1)*(1. + erf( (xi - x0)/sg) )/2. for xi in x ] )
+
+def step(x0, y1, y2, sg, x):   # works with arrays
+    # ~ return step_erf(x0, y1, y2, sg, x)
+    return np.array( [ (y2 - y1)*(1. + erf( (xi - x0)/sg) )/2. for xi in x ] )
+
+
+
+
+def step_test():
+    n = 200
+    stepx = np.array(n)
+    stepy = np.array(n)
+    stepx = np.asarray( [-100. + x*200.0/n for x in range(n)] )
+    stepy = np.array([ 0 for sx in stepx])
+    stepy = stepy + step(-50.,  0, 10, 5., stepx)
+    stepy = stepy + step(-20., 10, 20, 5., stepx)
+    stepy = stepy + step( 20., 20, 10, 5., stepx)
+    stepy = stepy + step( 50., 10,  0, 5., stepx)
+
+    fig, axs = plt.subplots(1)
+    axs.plot(stepx, stepy, label='step')
+    axs.grid(True)
+    plt.show()
+
+
 
 class _PhysConst:
-    _wl_A = 1.54     #//A Cu Ka1
-    _hh = 4.135667662E-15 #// eV*s
-    _cc = 299792458 #// m/s
-    _hc = 1.23984193 #// eV*um
+    _wl_A = 1.54     # //A Cu Ka1
+    _hh = 4.135667662E-15 # // eV*s
+    _cc = 299792458 # // m/s
+    _hc = 1.23984193 # // eV*um
     _keV = _hc/_wl_A*10.0
-    _re = 2.8179403E-15      #//m
-    _Na = 6.0221E23              #// 1/mol
-        
+    _re = 2.8179403E-15      # //m
+    _Na = 6.0221E23              # // 1/mol
+
     def __init__(self):
         self._keV = self.wlA2keV(self._wl_A)
-        
+
     def wlA2keV(self, wlA):
         self._wl_A = wlA
         self._keV = self._hc/wlA*10.0
         return self._keV
-        
+
     def keV2wlA(self, keV):
         self._keV = keV
         self._wl_A = self._hc/keV*10.0
@@ -41,16 +121,16 @@ class _XLayer:
     _dd = 0  # thickness A
     _sg = 0  # roughness A
     _rh = 0  # density g/cm^3
-    
+
     _hd = ['Name', 'Composition', 'd [A]', 'sg [A]', 'rho [g/cm^3]', 'Mm [g/mol]', 'Vm [A^3]']
-    
+
     AtomS = []
     AtomN = []
     AtomM = []
     AtomV = []
     _Mm = 0  # Molas mass
     _Vm = 0  # Molar volume
-    
+
     Q = []   # q vector
     SF = []   # scattering factor(q) for the layer
     SFa = []  # scattering factor(q) for each atom type
@@ -63,15 +143,15 @@ class _XLayer:
     Bt = []   # betha
     R = []   # reflectivity (complex)
     R2 = []
-    
+
     _re = _PhysConst()._re
     _Na = _PhysConst()._Na
     _hc = _PhysConst()._hc
-    
+
     _wl_A = 1.54
     _keV = 8.9
-    
-    
+
+
     def __init__(self, name="", comp="", d=1.0, s=0.0, r=1.0, M=1.0, V=1.0):
         self._name = name
         self._comp = comp
@@ -80,29 +160,29 @@ class _XLayer:
         self._rh = r  # density       g/cm^3
         self._Mm = M  # molar Mass    g
         self._Vm = V  # molar Volume  m^3
-        
+
         self.AtomS = []
         self.AtomN = []
         self.AtomM = []
         self.AtomV = []
-                
+
         self._re = _PhysConst()._re
         self._Na = _PhysConst()._Na
         self._hc = _PhysConst()._hc
-        
+
         self._wlA = 1.54
         self.f_wlA(self._wlA)
-        
+
         self.f_comp2chem()
 
-        
+
     def f_qwaves(self, qq):
         # qq = Q vector
         nq = len(qq)
         self.Q = qq.copy()
 
         self.SF   = np.array(qq, dtype=np.complex_)   # scattering factor for layer
-        self.SFa = []
+        self.SFa = []   # for one atom type
         #https://periodictable.readthedocs.io/en/latest/api/xsf.html
         self.SLD  = np.array(qq, dtype=np.complex_)   # SLD scattering length density
         self.K   = np.array(qq, dtype=np.complex_)    # wave-vector k
@@ -113,31 +193,38 @@ class _XLayer:
         self.Bt   = np.array(qq, dtype=np.complex_)    # betha
         self.R   = np.array(qq, dtype=np.complex_)    # reflectivity (complex)
         self.R2 = np.array(qq)                          #refl. int.
-        
-        
+
+
     def f_keV(self, keV):
         self._keV = keV
         self._wlA = self._hc/self._keV*10.0
-        
+
     def f_wlA(self, wlA):
         self._wlA = wlA
         self._keV = self._hc/self._wlA*10.0
-        
+
     def f_SF(self, qq, keV):
         # ~ input is "Atom name", Q = 2*pi/d=4*pi*sin(theta)/Lambda [A^-1], and energy in keV
-        # ~ returns Complex f0+fp + i* fpp   in [electron units]        
+        # ~ returns Complex f0+fp + i* fpp   in [electron units]
         self.f_keV(keV)
         for atm, AN in zip(self.AtomS, self.AtomN):
             f0 = Cromer()._f0Q(atm, qq)
             fp = Cromer()._fpE(atm, keV)
-            asfwv = f0 + fp[0] + fp[1]*1j 
+            asfwv = f0 + fp[0] + fp[1]*1j
             self.SFa.append(asfwv)
             self.SF += asfwv*AN
-            
+
     def f_SLD(self):
         self.SLD = self._re*1.0E-14*(self._Na*self._rh/self._Mm)*self.SF
-    
+
     def f_comp2chem(self):
+        def blank_strip(string):
+            bstring = ""
+            for c in string:
+                if c not in (' ', '\t', '\n'):
+                    bstring += c
+            return bstring
+
         self.AtomS = []
         self.AtomN = []
         if self._comp == "":
@@ -156,40 +243,71 @@ class _XLayer:
         Vm_cm3 = self._Mm/self._rh/self._Na #//(g/mol)/(g/cm^3)/(1/mol) = cm^3
         Vm_A3  = Vm_cm3*1.0e24 #//A^3
         self._Vm = Vm_A3
-        
-    
+
+
     def __header__(self):
         return    "Name    | Chemical Composition | d_[A]| s_[A]|[g/cm^3]|[g/mol]| [A^3]"
-                 
+
     def __line__(self):
         return    "_____________________________________________________________________"
-        
-        
+
+
     def __str__(self):
         t =  f"{self._name:5s}  {self._comp:12s}  {self._dd:4.1f}  {self._sg:4.1f}  {self._rh:7.4f}  "
         t += f"{self._Mm:5.1f}  {self._Vm:7.1f}"
         return t
 
 
-    
+
+
+
+
 ########################################################################
 ########################################################################
 ########################################################################
 
+
+
 class XRR():
+
+    class _Socket():
+        # improper event connector
+        # destination function will just print, nothing more
+        # do not try to plot, for example in fit_upd()
+        # will get:
+        # RuntimeError: main thread is not in main loop
+        def __init__(self, dest=None, func=None):
+            self.dest = dest
+            self.func = func
+            if dest and func:
+                self.connect(dest, func)
+        def connect(self, dest, func):
+            self.dest = dest
+            self.func = func
+            return self
+        def emit(self, data):
+            self.write(data)
+        def write(self, data):
+            self.data = data
+            self.func(self)
+        def set(self, data):
+            self.data = data
+        def flush(self): pass
     
-    _a0 = 1.0 #//scale  
+
+    
+    _a0 = 1.0 #//scale
     _b0_m = 1.0 # bgnd mantisse
     _b0_e = -6  # bgnd exponent
     _b0 = _b0_m*10.0**_b0_e
     # ~ self.b0 = self.b0_m*np.exp(self.b0_e*np.ln(10.0)) #//backgroung zero level
     _2tht0 = 0.2
-    
-    _wl_A = 1.54     #//A Cu Ka1
+
+    _wl_A = 1.5406     #//A Cu Ka1
     _keV = _PhysConst().wlA2keV(_wl_A)
-    
-    LL = [] # layer array
-    
+
+    LL = [] # layer arraysuper().__init__()
+
     mx = []     # measured data
     my = []
     xx = []     # truncated for xx < _2tht0
@@ -203,83 +321,237 @@ class XRR():
     r0q4 = []   # rr0 * q^4
     r1q4 = []   # rr1 * q^4
     ryq4 = []   # fit rezidue (yq4 - r1q4)
-    
+
     fitn = 0
     fiterr = 0
     fitkeys = [ 'ab', 'dd', 'rh', 'sg']
-    fitmode = 0
+    fitmode = 0 #0=LM, 1=DE
+    fitprof = 0 # 0 = layer, 1 = profile
     abort = 0
     fitmax = 100
-    
+    update = 100
+
     popt = []
     pcov = []
     perr = []
     ferr = []
+
+    _pdz = 2.0
+    plot_plots = None
+    plot_anchx = 1.0
+    plot_anchy = 1.0
+    plot_drag = True
     
-    whrn = 3
-        
+    help_str="""
+<!DOCTYPE html PUBLIC >
+<html>
+<head>
+    <title>XRR help file</title>
+    <style type="text/css">
+    <!--
+     .tab1 { margin-left: 40px; padding: 0 0 0 0;}
+     .tab2 { margin-left: 80px; padding: 0 0 0 0;}
+     p {indent-text: 5em;}
+    -->
+    </style>
+</head>
+<body>
+1) Load data file (2tht - int) <br>
+2) create model for layer structure <br>
+3) Fit Layer model <br>
+&ensp;Settings: <br> 
+&emsp;  L-M: Levenberg-Marquardt <br>
+&emsp;  D-E: Differential Evolution <br> 
+&emsp;  Update every: 20 ~ 100 function evaluations <br>
+
+4) Fit Profile: density <br>
+<br>
+----------------------------------------------- <br>
+OBSERVATIONS<br>
+!!! one iteration needs (2*N_parameters) of function evaluations <br>
+e.g.: for 5 layers+substrate when fitting: <br>
+&ensp;  * thickness, density, roughness <br>
+&ensp;  + background and scale <br>
+one needs: 6*3 + 2 = 20 parameters <br>
+therefore: 1 iteration needs 2*20 = 40 function evaluations <br>
+<br>
+For profile fitting: <br>
+Suppose a 200 A structure and a profile step of 2 A <br>
+&ensp;  results in 100 parameters for the density profile <br>
+&emsp;  additional 100 parameters for each atom composition profile <br>
+total: 200 + N_atom*200 function evaluations for 1 iteration !!!
+</body>
+</html>
+        """
+
+    def __repr__(self):
+        return "self=XRR"
+
+    def __str__(self):
+        s  = _XLayer().__line__() +'\n'
+        s += _XLayer().__header__() +'\n'
+        s += _XLayer().__line__() +'\n'
+        for  L in self.LL: # layers
+            s += str(L) +'\n'
+        s += _XLayer().__line__() +'\n'
+        return s
+
     def __init__(self):
-        super().__init__()
-        where("", self.whrn)
+
         self.fitkeys = [ 'ab', 'dd', 'rh', 'sg']
+        self.fitprof = 0
         self.fitmode = 0
         self.fitmax = 100
+        self.update = 100
         self.abort = 0
         self.fitn = 0
-        
-        self._a0 = 1.0 #//scale  
+
+        self._a0 = 1.0 #//scale
         self._b0_m = 1.0 # bgnd mantisse
         self._b0_e = -6  # bgnd exponent
         self._b0 = self._b0_m*10.0**self._b0_e
-        
+
         self._keV = _PhysConst().wlA2keV(self._wl_A)
-        
-        self.xrr_str()
+
+        self.test_str()
         # ~ self.data_load('xrr_test.dat')
         self.data = self.data_str
-        self.data_parse()   # ~ >>  mx, my "measured data": delete data points < _2tht0
-        self.data_init()   # >> xx, yy, qq, qq4, yq4, rr0, rr1, r0q4, r1q4, ryq4
-        
+        self.data_parse()
+        # ~ >>  mx, my "measured data": delete data points < _2tht0
+        self.data_init()
+        # >> xx, yy, qq, qq4, yq4, rr0, rr1, r0q4, r1q4, ryq4
+
         # ~ self.layer_load('xrr_test.xrr')
         # ~ self.layer_save('xrr_test.xrr')
         self.layer = self.layer_str
-        self.layer_parse() 
+        self.layer_parse()
         self.layer_init()
         self.layer_print()
         self.layer_profile()
-        
-        self.xrr()
-        # ~ self.fit()
+        self.xrr_layer()
+        self.fit_set_fitkeys()
+        # ~ self.fit_layer()
         self.fitmax = 0
 
+        self.signal_run = self._Socket(self, self.fit_run)
+        self.signal_upd = self._Socket(self, self.fit_upd)
+        self.signal_end = self._Socket(self, self.fit_end)
 
-    
+        self.fit_worker = None
+
+        # ~ self.print_2socket()
+        
+
+        ##################INIT###################
+
+    def __del__(self):
+        sys.stdout = sys.__stdout__
+        sys.stderr = sys.__stderr__
+
+    def print_2sys(self):
+        sys.stdout = sys.__stdout__
+        sys.stderr = sys.__stderr__
+
+    def print_2socket(self):
+        sys.stdout = self._Socket().connect(dest=self, func=self.print_out)
+        sys.stderr = self._Socket().connect(dest=self, func=self.print_err)
+
+
+    def print_out(self, event):
+        sys.__stdout__.write(event.data)
+        sys.__stdout__.flush()
+
+
+    def print_err(self, event):
+        sys.__stderr__.write(event.data)
+        sys.__stdout__.flush()
+
+
+    def fit_prestart(self, event):    # please overload in wx, qt lass
+        pass
+
+    def fit_wait(self):
+        t0 = time.time()
+        while self.fit_worker:  #.is_alive():
+            time.sleep(1)
+            t1 = time.time()
+            print(f'#{self.fitn}({(t1-t0):.2f} s)')
+
+
+    def fit_start(self, event):
+        # Trigger the worker thread unless it's already busy
+        if self.fit_worker == None:
+            """Start Computation."""
+            self.fit_prestart(event)
+            print('\nxrr>> Creating worker and start', flush=True)
+            self.fit_worker = Thread(target=self.fit, args=())
+            self.fit_worker.start()
+            # ~ a = fit_worker.is_alive()
+            # ~ l = threading.enumerate()
+            # ~ fit_worker.join()
+
+    def fit_stop(self, event):
+        if self.fit_worker != None:
+            if self.fit_worker.is_alive():
+                """Abort Computation."""
+                print('\nxrr>>: Set self.abort = 1', flush=True)
+                self.abort = 1
+            else:  # not alive
+                """Reseting Computation."""
+                print('\nxrr>>: (worker is not None) and is not alive() ', flush=True)
+                self.fit_worker = None
+
+
+    def fit_run(self, event):
+        # ■  ▄ ▀ ¦ ░ ▒ ▓ █ ║ ╗ ╝ ╚ ╔ ╩ ╦ ╠ ═ ╬
+
+        # ~ if self.fitn % 2 :
+            # ~ print("▄", end='', flush=True)
+        # ~ else:
+            # ~ print("▀", end='', flush=True)
+        print("■", end='', flush=True)
+        return
+
+    def fit_upd(self, event):
+        print( f'\nxrr>>: update {event.data}', flush=True)
+        return
+
+
+
+    def fit_end(self, event):
+        print( f'\nxrr>>: finish {event.data}', flush=True)
+        # ~ self.fit_upd(event)
+        self.fit_worker = None
+        return
+
+
+
     def layer_add(self, layer = _XLayer()):
         self.LL.append(layer)
-    
-    def layer_save(self, fname): 
+
+    def layer_save(self, fname):
         fileh = open(fname,"w")
         header = '# name , chem_comp , thickness_[A] , roughness_[A] , density_[g/cm^3] \n'
         fileh.write(header)
         # ~ print(header)
         for L in self.LL:
-            line = L._name + ' , ' + L._comp + ' , ' + str(L._dd) + ' , ' + str(L._sg) + ' , ' + str(L._rh) + ' \n' 
+            line = L._name + ' , ' + L._comp + ' , ' + str(L._dd) + ' , ' + str(L._sg) + ' , ' + str(L._rh) + ' \n'
             fileh.write(line)
             # ~ print(line)
         fileh.close()
-        
-        
+
+
     def layer_load(self, fname):
         self.file_layer = fname
-        with open(fname) as fileh:  
+        with open(fname) as fileh:
             layer = fileh.readlines()
             fileh.close()
         self.layer = ""
         for l in layer:
             self.layer += l
-            
+
     def layer_parse(self):
-        where("", self.whrn)
+        # ~ print_(where())
         self.LL = []
         for line in self.layer.splitlines():
             if line[0] != '#' :
@@ -287,47 +559,83 @@ class XRR():
                 [name, comp, s_dd, s_sg, s_rh] = line.split(',')
                 self.layer_add(_XLayer(name,  comp, d=float(s_dd),  s=float(s_sg), r=float(s_rh) ))
         return
-    
+
     def layer_print(self):
-        print( _XLayer().__line__() )
-        print( _XLayer().__header__() )
-        print( _XLayer().__line__() )
-        for  L in self.LL: 
-            print( L )
-        print( _XLayer().__line__() )
-        
-    
+        print(self)
+
+
     def layer_init(self):
-        where("", self.whrn)
-        for  L in self.LL: 
+        # ~ print_(where())
+        for  L in self.LL:
             L.f_comp2chem()
             L.f_qwaves(self.qq)
             L.f_SF(self.qq, self._keV)
             L.f_SLD()
-        
-        
+
+
+
+    def file_dialog_open(self, pattern='.txt'):
+        '''
+        Documentation references for the modules, constants and functions used above:
+        The os and os.path modules.
+        The __file__ constant
+        os.path.realpath(path) (returns "the canonical path of the specified filename, eliminating any symbolic links encountered in the path")
+        os.path.dirname(path) (returns "the directory name of pathname path")
+        os.getcwd() (returns "a string representing the current working directory")
+        os.chdir(path) ("change the current working directory to path")
+        '''
+        import os
+        # ~ cwd = os.path.dirname(os.path.realpath(__file__))
+        cwd = os.getcwd()
+        # ~ os.chdir()
+        # ~ mypath = "./"
+        print(cwd)
+        mypath = cwd
+        # ~ (_, _, filenames) = next(os.walk(mypath))
+        import glob
+        glob_patt = mypath+"/*"+pattern
+        print(glob_patt)
+        filenames = glob.glob(glob_patt) # "./*.txt"
+        for n,f in enumerate(filenames): print(n, f)
+        ff = input("dat filename index:")
+        return filenames[int(ff)]
+
+    def data_load_gui(self, pattern=".dat"):
+        self.pathname = self.file_dialog_open(pattern)
+        print( self.pathname)
+        if self.pathname:
+            self.data_load(self.pathname)
+            self.data_parse()
+            self.data_init()
+            self._plot()
+
+
     def data_load(self, fname):
         self.file_data = fname
-        with open(fname) as fileh:  
+        with open(fname) as fileh:
             data = fileh.readlines()
             fileh.close()
         self.data = ""
         for d in data:
             self.data += d
 
-            
+
     def data_parse(self):
-        where("", self.whrn)
+        # ~ print_(where())
         xx, yy = [], []
+        i=0
         for line in self.data.splitlines():
             vx, vy = line.split()
-            xx.append(float(vx))
-            yy.append(float(vy))
+            # ~ if not i%4:
+            if 1:
+                xx.append(float(vx))
+                yy.append(float(vy))
+            i += 1
         self.mx = np.asarray(xx)
         self.my = np.asarray(yy)
-        
+
     def data_init(self):
-        where("", self.whrn)
+        # ~ print_(where())
         self.xx = self.mx.copy()
         self.yy = self.my.copy()
 
@@ -337,121 +645,134 @@ class XRR():
         self.yy = np.delete(self.yy, indxArr)
 
         vv =self.yy.max()
-        self.yy /= vv 
+        self.yy /= vv
         self.my /= vv
-        
+
         self.qq = self.xx.copy()
         self.qq = 4.0*np.pi*np.sin(self.xx/2.0*np.pi/180.)/self._wl_A
-        
+
         self.qq4 = self.qq.copy()
         self.qq4 = self.qq**4   #   qq*qq*qq*qq
-        
+
         self.yq4 = self.yy.copy()
         self.yq4 = self.yy * self.qq4
-        
+
         self.rr0 = self.yy.copy()  # without scale and background
         self.rr0 = self.yy*0.8
-                
+
         self.rr1 = self.yy.copy()  # = a0*refl0+b0
         self._a0=1.0
         self._b0=1.0e-6
         self.rr1 = self.rr0*self._a0 + self._b0
-        
+
         self.r0q4 = self.yy.copy()   # = refl0*qq4
         self.r0q4 = self.rr0*self.qq4
-        
+
         self.r1q4 = self.yy.copy()   # = refl1*qq4
         self.r1q4 = self.rr1*self.qq4
-        
+
         self.ryq4 = np.zeros(len(self.qq)) # fit residue
         self.ryq4 = np.abs(self.yq4)/10.0
-        
-        
-    def plot(self):
-        fig, axs = plt.subplots(2, 2)
-        ax1 = axs[0][0]
-        ax2 = axs[1][0]
-        ax3 = axs[0][1]
-        ax4 = axs[1][1]
-        # Adjust the scaling factor to fit your legend text completely outside the plot
-        # (smaller value results in more space being made for the legend)
-        fig.subplots_adjust(right=0.98)
-        ax = 1.02
-        ay = 1.1
-        drag = True
-        self.plot1(ax1, ax, ay, drag)
-        self.plot2(ax2, ax, ay, drag)
-        self.plot3(ax3, ax, ay, drag)
-        self.plot4(ax4, ax, ay, drag)
-        plt.tight_layout()
-        plt.show()
-        return
 
-        # ~ ax = pg.figure.add_subplot(111)
-        # ~ ax = pg.figure.gca(projection = '3d') 
-        
-        # ~ axes = plt.gca()
-        # ~ axes.set_xlim([xmin,xmax])
-        # ~ axes.set_ylim([ymin,ymax])
 
-        # ~ ticks = np.arange(0., 8.1, 2.)
-        # ~ tickLb = ['%1.2f' % tick for tick in ticks] # list comprehension to get all tick labels...
-        # ~ ax1.xaxis.set_ticks(ticks)
-        # ~ ax2.xaxis.set_ticks(ticks)
-        # ~ ax2.xaxis.set_ticklabels(tickLb)
-        # ~ ax2.set_xlim(ax1.get_xlim())
-        # ~ plot(x, y, 'go--', linewidth=2, markersize=12)
-        # ~ plot(x, y, color='green', marker='o', linestyle='dashed', linewidth=2, markersize=12)
+    def _plot(self):
+        self.plot_anchx = 1.02
+        self.plot_anchy = 1.1
+        self.plot_drag = True
         
-    def plot1(self, ax1, ax, ay, drag):
+        if not self.plot_plots:
+            p1 = Panel_Plot( row=2, col=1, 
+                fplots=[self._plot_refl1, self._plot_refl2])
+            p2 = Panel_Plot( row=2, col=1, 
+                fplots=[self._plot_prof1, self._plot_prof2])
+            p3 = Panel_Plot( row=1, col=1, 
+                fplots=[self._plot_err])
+            self.plot_plots = [p1, p2, p3]
+        # ~ else:
+        for p in self.plot_plots: p.plot()
+
+
+    def _plot_refl1(self, ax1):
+        ancx = self.plot_anchx
+        ancy = self.plot_anchy
+        drag = self.plot_drag
+        ax1.clear()
         ax1.plot(self.mx, self.my, label='$meas.$', c='k')
         ax1.plot(self.xx, self.yy, label='$meas.''$', c='g', linewidth=1.5)
         ax1.plot(self.xx, self.rr1, label='$calc.$', c='r', linewidth=1.5)
-        ax1.legend(loc=2, bbox_to_anchor=(ax, ay), ncol=1, fontsize=8, title='').draggable(drag)
+        ax1.legend(loc=2, bbox_to_anchor=(ancx, ancy),
+            ncol=1, fontsize=8, title='').draggable(drag)
         ax1.grid(True)
-        ax1.set_xlabel(r'$2 \theta \ [deg]$')  # raw string r'jfkejrf' or use '$\\theta \\rho$
+        ax1.set_xlabel(r'$2 \theta \ [deg]$')
+        # raw string r'jfkejrf' or use '$\\theta \\rho$
         ax1.set_ylabel(r'$I/I_{max}$')
         ax1.set_yscale('log')
 
-        
-    def plot2(self, ax2, ax, ay, drag):
+
+
+    def _plot_refl2(self, ax2):
+        ancx = self.plot_anchx
+        ancy = self.plot_anchy
+        drag = self.plot_drag
+        ax2.clear()
         ax2.plot(self.qq, self.yq4, label='meas.', c='g', linewidth=1.5)
         ax2.plot(self.qq, self.r1q4, label='calc.', c='r', linewidth=1.5)
         for L in self.LL:
             ax2.plot(self.qq, abs(L.R2*L.Q**4), label=L._name, linewidth=0.75)
-        ax2.legend(loc=2, bbox_to_anchor=(ax, ay), ncol=1, fontsize=8, title=r'$R^2Q^4$').draggable(drag)  
+        ax2.legend(loc=2, bbox_to_anchor=(ancx, ancy),
+            ncol=1, fontsize=8, title=r'$R^2Q^4$').draggable(drag)
         ax2.grid(True)
         ax2.set_yscale('log')
         ax2.set_xlabel(r'$Q=4 \pi \ sin(\theta)/ \lambda \ [1/ \AA]$')
         ax2.set_ylabel(r'$int*\ Q^4$')
         ax2.set_ylim([min(self.yq4)/5., max(self.yq4)*5.])
 
-        
-        
-    def plot3(self, ax3, ax, ay, drag):
+
+
+
+    def _plot_prof1(self, ax3):
+        ancx = self.plot_anchx
+        ancy = self.plot_anchy
+        drag = self.plot_drag
+        ax3.clear()
         ax3.plot(self.p_z, self.p_rh, c='r', label=r'$profile $')
         ax3.plot(self.p_z, self.p_rL, c='k', label=r'$layer $')
-        ax3.legend(loc=2, bbox_to_anchor=(ax, ay), ncol=1, fontsize=8, title=r'$\rho \ [g/cm^3]$').draggable(drag)
+        ax3.legend(loc=2, bbox_to_anchor=(ancx, ancy),
+            ncol=1, fontsize=8, title=r'$\rho \ [g/cm^3]$').draggable(drag)
         ax3.grid(True)
         ax3.set_ylabel(r'$\rho \ [g/cm^3]$')
         ax3.set_xlabel(r'$z \ [\AA]$')
 
-    def plot4(self, ax4, ax, ay, drag):
-        for a, p_c in zip(self.atoms, self.atomp):
-            ax4.plot(self.p_z, p_c, label=a)
-        ax4.legend(loc=2, bbox_to_anchor=(ax, ay), ncol=1, fontsize=8, title=r'$atoms$').draggable(drag)
+
+    def _plot_prof2(self, ax4):
+        ancx = self.plot_anchx
+        ancy = self.plot_anchy
+        drag = self.plot_drag
+        ax4.clear()
+        for a, p_ac in zip(self.atoms, self.p_ac):
+            ax4.plot(self.p_z, p_ac, label=a)
+        ax4.legend(loc=2, bbox_to_anchor=(ancx, ancy),
+            ncol=1, fontsize=8, title=r'$atoms$').draggable(drag)
         ax4.grid(True)
         ax4.set_ylabel(r'$comp. index$')
         ax4.set_xlabel(r'$z \ [\AA]$')
 
-       
+    def _plot_err(self, axs):
+        axs.clear() 
+        y = self.ferr    
+        n = len(y)
+        x = [i for i in range(n)]   
+        axs.plot(x, y)
+        axs.set_yscale('log')
+
+
     def layer_to_fitparam(self):
-        where("", self.whrn)
+        # ~ print_(where())
         self.pfit = []
         self.pkey = []
-        def keyadd( key, idx): 
+        def keyadd( key, idx):
             self.pkey.append( [ key, idx, key+'['+str(idx)+']' ] )
-        
+
         for key in self.fitkeys:
             if key == 'ab':
                 self.pfit.append(self._a0)
@@ -479,14 +800,13 @@ class XRR():
         # ~ for k, p in zip( self.pkey, self.pfit):
             # ~ print(k[2],'=', p)
         return self.pfit
-        
-                    
+
+
     def layer_from_fitparam(self, pw):
-        # ~ where(f"{self.fitn}", 3)
         N=0
         for key in self.fitkeys:
             if key == 'ab':
-                self._a0 = pw[N+0]    
+                self._a0 = pw[N+0]
                 self._b0 = pw[N+1]
                 N = N+2
             if key == 'dd':
@@ -507,89 +827,144 @@ class XRR():
                     L._sg = abs(pw[N+l])
                     l=l+1
                 N = N + len(self.LL[:-1])
-                
-                
-                
-                
-    def set_fitkeys(self, fitkeys=[ 'ab', 'dd', 'rh', 'sg']):
+
+
+
+    # ~ -----
+    # ~ def print_kwargs(**kwargs):
+        # ~ for key, value in kwargs.items():
+            # ~ print(f"({key} = {value}), ", end='')
+        # ~ print()
+    # ~ -----
+    # ~ def print_dictio(dictionary):
+        # ~ for key, value in dictionary.items():
+            # ~ print(f"({key} = {value}), ", end='')
+        # ~ print()
+    # ~ ------
+    # ~ def dict_add(d, **kw): return d.update(kw)  # add more key:values from **kw
+    # ~ ------
+
+    def fit_set_fitkeys(self, fitkeys=[ 'ab', 'dd', 'rh', 'sg']):
     #===================================================
         self.fitkeys = fitkeys
-    
-    def print_kwargs(self, **kwargs):
-    #================================
-        for key, value in kwargs.items():
-            print("{} = {}, ".format(key, value), end='')
-        print()
-        
-    def print_dictio(self, dictionary):
-    #================================
-        for key, value in dictionary.items():
-            print(f"{key} = {value}")
-            # ~ print("________________________________________________")
-                
-    def post_event(self, **kw):
-    #=================================
-        # ~ d = {'fitn':self.fitn, 'err':"{0:.1e}".format(self.fiterr)}
-        d = {'fitn':self.fitn, 'err':f"{self.fiterr:.2e}" }
-        d.update(kw)    # add more key:values from **kw
-        # ~ m = {0:'L-M', 1:'D-E'}
-        # ~ n = {'@':'XRR', 'fit':m[self.fitmode]}
-        # ~ d.update(n)
-        where(f"\n>>{d}",1)
-    
 
-    def fit(self):
-    #========================
-        where("", self.whrn)
-        # ~ print('\t XRR.fit()')
 
-        # ~ def zero(): self.r1q4[:] = 0.1
-        def zero(): self.r1q4 = self.yq4
-        #============================
-        def xrrp(qq, *pw):
-        #===================
-            # ~ qq=4*pi*sin(tht)/wl
-            # ~ pw=fit parameter wave
-                
-            self.layer_from_fitparam(pw)    
-            self.r1q4 = self.xrr()  
-            self.fitn = self.fitn + 1
-            yc = self.r1q4
-            ym = self.yq4
-            self.fiterr = np.sqrt(sum((ym - yc)**2) / len(ym))
-            self.ferr.append(self.fiterr)
-            print(".", end='', flush=True)
-        
-            if not (self.fitn % update ):
-                self.post_event(key=1, msg='fitting' )
 
-            if (self.fitmax !=0):
-                if (self.fitn > self.fitmax): 
-                    zero()
-                    self.post_event(key=1, msg='n > nmax')
-                    #--------------------------------------
-            if (self.abort ): 
+    def fit_process(self, **kw):
+        # ~ called by xrr_layer_LM(), etc.
+        # ~ self.r1q4 calculated in calling function
+        # ~ process result and return to calling routine
+        # ~ using class variables to return result
+        #=================================
+        def zero(): self.r1q4 = self.yq4    # used to stop the fitting
+        #=================================
+        class _data():
+            def __init__(self, data):
+                self.data = data
+        #=================================
+        yc = self.r1q4
+        ym = self.yq4
+        self.fiterr = np.sqrt(sum((ym - yc)**2) / len(ym))
+        self.ferr.append(self.fiterr)
+
+        d = dict( fitn=self.fitn, err=self.fiterr , key=1, msg='fitting')
+        d.update(kw)    # update key, msg
+
+        if d['key']==0: # end fitting
+            self.signal_end.emit(d)
+            # ~ self.fit_end(_data(d))
+        else:
+            if (self.fitmax !=0) and (self.fitn > self.fitmax):
                 zero()
-                self.post_event(key=-1, msg='aborting')
-                #------------------------------------
-            return self.r1q4 
-        #def_end
+                d.update(dict(key=-1, msg='n>nmax'))
+            if (self.abort ):
+                zero()
+                d.update(dict(key=-1, msg='aborting'))
 
-        def xrrd(p, *data):
-        #===================
-            if not (self.fitn % update):
-                self.post_event(key=1,  msg='fitting')
-            self.fitn =self.fitn +1
+        if not (self.fitn % self.update ):
+            self.signal_upd.emit(d)
+            # ~ self.fit_upd(_data(d))
+        else:
+            self.signal_run.emit(d)
+            # ~ self.fit_run(_data(d))
+
+        self.fitn =self.fitn +1
+        return
+
+    # ~ @q
+    def fit(self):
+        self.fitn = 0
+        self.nit = 0
+        self.abort = 0
+        self.ferr = []
+        self.key = 0
+        # ~ self.update = 20
+        # ~ self.fitmax = 200
+
+        if self.fitprof ==0:
+            print("----------XRR fit layer--------------")
+            self.layer_to_fitparam()
+            if self.fitmode is 0:   self.fit_layer_LM()
+            if self.fitmode is 1:   self.fit_layer_DE()
+            self.layer_from_fitparam(self.popt)
+            self.xrr_layer()
+        if self.fitprof ==1:
+            print("----------XRR fit profile--------------")
+            self.layer_profile()    #>> nz
+            self.profile_SLD()
+            self.z1 = 1
+            self.dz = self.nz - 1
+            self.prof2parm()
+            if self.fitmode is 0:   self.fit_profile_LM()
+            if self.fitmode is 1:   self.fit_profile_DE()
+            self.parm2prof(self.popt)
+            self.xrr_profile()
+
+        self.ryq4 = self.yq4 - self.r1q4
+        self.fit_process(key=0, msg='finished')
+
+
+
+    def fit_layer_LM(self):
+        #######################################
+        def xrr_layer_LM(qq, *pw):              # ~ qq=4*pi*sin(tht)/wl
+            self.layer_from_fitparam(pw)        # ~ pw=fit parameter wave
+            self.r1q4 = self.xrr_layer()
+            self.fit_process()
+            return self.r1q4
+        ####################
+        print('fit Nonlinear Least-Squares ', self.fitkeys)
+        self.r1q4 = xrr_layer_LM(self.qq, *self.pfit)
+
+        # try using full_output
+        res =  scipy.optimize.curve_fit( xrr_layer_LM, self.qq, self.yq4,
+            p0 = self.pfit, full_output=1)
+        popt, pcov, infodict, errmsg, ier = res
+        print()
+        print('_________________________________________________________________')
+        print('errmsg =', errmsg)
+
+        # ~ normal output fit
+        #####################
+        # ~ res =  scipy.optimize.curve_fit( xrrp,
+            # ~ self.qq, self.yq4, p0 = self.pfit)
+        # ~ popt, pcov = res
+
+        self.popt, self.pcov = popt, pcov
+        self.perr = np.sqrt(np.diag(pcov))
+        print('perr = ', self.perr)
+
+
+    def fit_layer_DE(self):
+        #######################################
+        def xrr_layer_DE(p, *data):
             x, y = data
             self.layer_from_fitparam(p)
-            self.xrr()   # >> xrr.r1q4 
-            yc = self.r1q4
-            ym = self.yq4
-            self.fiterr = np.sqrt(sum((ym - yc)**2) / len(ym))
-            self.ferr.append(self.fiterr)
+            self.r1q4 = self.xrr_layer()
+            self.fit_process()
             return self.fiterr
-        #def_end
-        
+        ####################
+
         class Callback(object):
             def __init__(self):
                 self.nit = 0
@@ -598,83 +973,39 @@ class XRR():
                 # ~ print(self.nit, flush=True)
                 self.nit += 1
 
-        
-        self.fitn = 0
-        self.nit = 0
-        self.abort = 0
-        self.ferr = []
-        update = 20
-        maxiter = 5
-        
-        # ~ self.layer_print()
-        self.layer_to_fitparam()
-            
-        if self.fitmode is 0:
-        #====================
-            
-            print('fit Nonlinear Least-Squares ', self.fitkeys)  
-            self.r1q4 = xrrp(self.qq, *self.pfit)
+        ##########################
+        self.fitmax=0
+        maxiter = 20
+        print('fit differential evolution :', self.fitkeys)
 
-            # try using full_output
-            res =  scipy.optimize.curve_fit( xrrp, self.qq, self.yq4, 
-                p0 = self.pfit, full_output=1)
-            popt, pcov, infodict, errmsg, ier = res
-            print('_________________________________________________________________')
-            print('errmsg =', errmsg)
-            # ~ print('ier =', ier)
-            # ~ print('infodict =')
-            # ~ self.print_dictio(infodict)
-                
-            # ~ normal output fit
-            #####################
-            # ~ res =  scipy.optimize.curve_fit( xrrp, 
-                # ~ self.qq, self.yq4, p0 = self.pfit)
-            # ~ popt, pcov = res
-                
-            self.popt, self.pcov = popt, pcov
-            self.perr = np.sqrt(np.diag(pcov))
-            print('perr = ', self.perr)
+        bounds = []
+        v = 0.25
+        for p in self.pfit:
+            bounds.append( (p*(1-v), p*(1+v)) )
+        # ~ print(bounds)
 
-            
-        if self.fitmode is 1:
-        #=====================
-            print('fit differential evolution :', self.fitkeys)
+        x = [v for v in self.qq]
+        y = [v for v in self.yq4]
+        p = [v for v in self.pfit]
 
-            bounds = []
-            v = 0.25
-            for p in self.pfit:
-                bounds.append( (p*(1-v), p*(1+v)) )
-            # ~ print(bounds)
+        args = (x, y)
+        xrr_layer_DE(p, *args) # check calling
 
-            x = [v for v in self.qq]
-            y = [v for v in self.yq4]
-            p = [v for v in self.pfit]
+        cback = Callback()
+        result = differential_evolution(xrr_layer_DE, bounds, args=args,
+            disp=True, callback=cback, tol=0.1, maxiter=maxiter)
+        #https://docs.scipy.org/doc/scipy/reference/generated/scipy.optimize.differential_evolution.html
+        # ~ from scipy.optimize import differential_evolution
+        # ~ scipy.optimize.differential_evolution(func, bounds, args=(),
+        # ~ strategy='best1bin', maxiter=1000, popsize=15, tol=0.01, mutation=(0.5, 1),
+        # ~ recombination=0.7, seed=None, callback=None, disp=False, polish=True,
+        # ~ init='latinhypercube', atol=0, updating='immediate', workers=1, constraints=())
 
-            args = (x, y)
-            xrrd(p, *args) # check calling 
-
-            cback = Callback()
-            result = differential_evolution(xrrd, bounds, args=args, 
-                disp=True, callback=cback, tol=0.1, maxiter=maxiter)
-            #https://docs.scipy.org/doc/scipy/reference/generated/scipy.optimize.differential_evolution.html
-            # ~ from scipy.optimize import differential_evolution
-            # ~ scipy.optimize.differential_evolution(func, bounds, args=(), 
-            # ~ strategy='best1bin', maxiter=1000, popsize=15, tol=0.01, mutation=(0.5, 1), 
-            # ~ recombination=0.7, seed=None, callback=None, disp=False, polish=True, 
-            # ~ init='latinhypercube', atol=0, updating='immediate', workers=1, constraints=())
-            
-            self.popt = result.x
-            print(result)
-        
-        ###############################################
-        self.layer_from_fitparam(self.popt)
-        self.xrr()
-        self.ryq4 = self.yq4 - self.r1q4
-        self.post_event(key=0, msg='finished')
+        self.popt = result.x
+        print(result)
 
 
-    def xrr(self):
-        # ~ where("",3)
+    def xrr_layer(self):
         nL = len(self.LL)
         nq = len(self.qq)
         nf = nL -1
@@ -683,105 +1014,58 @@ class XRR():
         SLDN = self.LL[nf].SLD          # sld in last outer layer
         for L in self.LL:               # K wave vector
             L.K = np.sqrt(self.qq*self.qq/4.0 - 4.0*np.pi*(L.SLD-SLDN))
-        
-        self.LL[ 0].F[:] = 1.0 + 0j 
-        self.LL[ 0].FA[:]= 1.0 + 0j 
-        self.LL[ 0].R[:] = 0.0 + 0j 
+
+        self.LL[ 0].F[:] = 1.0 + 0j
+        self.LL[ 0].FA[:]= 1.0 + 0j
+        self.LL[ 0].R[:] = 0.0 + 0j
         self.LL[ 0].Bt[:] = 1.0 + 0j
         self.LL[nf].Bt[:] = 1.0 + 0j
-        self.LL[ 0].R2[:] = 0.0 
-        
+        self.LL[ 0].R2[:] = 0.0
+
         R0   = self.LL[0].R
         K0   = self.LL[0].K
         sg0  = self.LL[0]._sg
-        
+
         for L in self.LL[1:]:
             L.F     = (L.K - K0)/(L.K + K0)     #Fresnel
             L.Phi   = L.K * K0 * sg0 * sg0      #phase
             L.Atn   = np.exp(-L.Phi)            #attenuation
             L.FA    = L.F * L.Atn               #Fresnel w. attn.
-            
+
             L.Bt    = np.exp(-2.0*1j*L.K*abs(L._dd)) #betha
-            
+
             L.R     = L.Bt*(R0 + L.FA)/(1.0 + R0*L.FA)  #refl.
             L.R2    = abs(L.R)**2                       #refl. int.
-            
+
             sg0     = L._sg
             K0      = L.K
             R0      = L.R
-            
+
         self.rr0 = self.LL[nf].R2       # refl. int in last outer layer
         self.rr1 = abs(self._a0)*self.rr0+abs(self._b0)     # with scale and bgnd
-        
+
         self.r0q4 = self.qq4*self.rr0
         self.r1q4 = self.qq4*self.rr1
-        
-        # ~ self.r0q4 = np.log(self.qq4*self.rr0)
-        # ~ self.r1q4 = np.log(self.qq4*self.rr1)
 
         return self.r1q4
-        
-        
-    def layer_profile(self):
-        where("",self.whrn)
-        # ~ print('\t XRR.layer_profile(), fitn=', self.fitn)
 
-        from mpmath import erf
-        def step0(x0, y1, y2, sg, x):
-            return (y2 - y1)*(1. + erf( (x - x0)/sg) )/2. 
-    
-        def step(x0, y1, y2, sg, x):
-            return np.array( [ (y2 - y1)*(1. + erf( (xi - x0)/sg) )/2. for xi in x ] )
 
-        t0 = time.time()
-        L_dd = np.asarray([ L._dd for L in self.LL ])
-        L_sg = np.asarray([ L._sg for L in self.LL ])
-        L_rh = np.asarray([ L._rh for L in self.LL ])
-        
-        nl = len(L_dd)
 
-        L_dt = L_dd.copy()
-        # ~ L_dt = [ 0 for i in L_dt ]
-        L_dt[:] = 0
-        dtt = 0
-        for i in range(nl):
-            dtt += L_dd[i]
-            L_dt[i] = dtt
-        dtt += 20 + 20 #//20 A at the substrate and top, each
 
-        dx = 2.0
-        nn = int(dtt/dx)
-        p_z = np.array(nn)
-        p_z = np.array([ -20.0 + x*dx for x in  range(nn) ])
 
-        # ~ //density profile: (y) with sigma; (b) square
-        p_rh = np.array(nn)
-        p_rL = np.array(nn)
-        st   = np.array(nn)
-        
-        p_rh = np.array( [ L_rh[0] for i in range(nn) ] )
-        p_rL = np.array( [ L_rh[0] for i in range(nn) ] )
-
-    
-        # ~ print('profile step density')
-        # ~ t0 = time.time()
-        for i in range(nl-1):
-            st = [ step0(L_dt[i],L_rh[i],L_rh[i+1], L_sg[i], x) for x in p_z]
-            p_rh = p_rh + st
-            st = [ step0(L_dt[i],L_rh[i],L_rh[i+1], 0.1, x) for x in p_z ]
-            p_rL = p_rL + st
-        # ~ t1 = time.time()
-        # ~ print( t1-t0 )
-        
-        # for each layer type get composition in each layer
-        atoms = []
-        for L in self.LL:
+    # ~ @timer
+    def layer_atoms_ASF(self):
+        # ~ print_(where())
+        #===============================
+        self.atoms = []          # array of atoms from all layers
+        for L in self.LL: # for each layer type get composition in each layer
             for a in L.AtomS:
-                if a not in atoms:
-                    atoms.append(a)
-        
-        atomc = []
-        for a in atoms:
+                if a not in self.atoms:
+                    self.atoms.append(a)
+        na = len(self.atoms)
+
+        self.atomc = []          # atomic composition index in each layer : atomc[atom#][layer#]
+        for a in self.atoms:
             LC = []
             for L in self.LL:
                 if a in L.AtomS:
@@ -790,41 +1074,297 @@ class XRR():
                 else:
                     c = 0.0
                 LC.append(c)
-            atomc.append(LC)
-        
-        # ~ print('profile step atoms')
-        # ~ t0 = time.time()
-        atomp = []
-        k=0
-        for a in atoms:
-            PA = np.array(nn)
-            PA = [ atomc[k][0] for x in range(nn) ]
-            for i in range(nl-1):
-                PA = PA + step( L_dt[i], atomc[k][i], atomc[k][i+1], L_sg[i], p_z) 
-            atomp.append(PA)
-            k=k+1
-        t1 = time.time()
-        # ~ print( t1-t0 )
-        
-        self.p_z = p_z
-        self.p_rh = p_rh
-        self.p_rL = p_rL
-        self.atoms = atoms
-        self.atomc = atomc
-        self.atomp = atomp
-        
-    def xrr_str(self):
-        where("",self.whrn)
+            self.atomc.append(LC)
+
+
+        # for each atom type
+        '''
+        we will use an approximation:
+        at x-ray Cu Ka1,2, for 2tht = [0 ..12.0] deg
+        q = 2sin(tht)/lambda = [0 .. 1.0]
+        and the ASF(q) ~ ASF(0)
+        '''
+        self.atomMm = []    # molar mass
+        self.atomSF = []    # scattering factor
+        qq0 = np.asarray([0.0])     # q array with one value = 0
+        for atm in self.atoms:  # >> self.atomSF
+            mm = _MolarMass().mm(atm)
+            self.atomMm.append( mm )
+
+            f0_ = Cromer()._f0Q(atm, qq0)
+            fp_ = Cromer()._fpE(atm, self._keV)
+            asf_ = f0_ + fp_[0] + fp_[1]*1j
+            self.atomSF.append(asf_[0])
+            # ~ print(f"\t{atm} Mm={mm} g/mol, ASF:{asf_[0]:.2f}")
+
+    # ~ @timer
+    def layer_profile_rho(self):
+        # ~ print_(where())
+        L_dd = np.asarray([ L._dd for L in self.LL ])
+        L_sg = np.asarray([ L._sg for L in self.LL ])
+        L_rh = np.asarray([ L._rh for L in self.LL ])
+        L_dz = L_dd.copy()  # gives the position of interface relative to layer 0
+        nl = len(L_dd)  # no. of layers
+
+        self.L_rh = L_rh
+        self.L_sg = L_sg
+        self.L_dz = L_dz
+
+        L_dz[:] = 0     # ~ L_dz = [ 0 for i in L_dt ]
+        zz = 0
+        for i in range(nl):
+            zz += L_dd[i]
+            L_dz[i] = zz
+
+        DZ = 20         #//20 A at the substrate and top, each
+
+        dz = self._pdz              # step for z axis
+        nz = int((zz+DZ+DZ)/dz)             # no. steps
+        self.nz = nz
+        ##################################
+        # ~ self.p_z = np.array(nz)
+        # ~ self.p_z = np.array([ -DZ + z*dz for z in  range(nz) ])
+        self.p_z = np.linspace(-DZ, zz+DZ, nz)
+        # ~ db(dz, nz, len(self.p_z),  nz*dz, zz, -DZ, self.p_z[0], zz+DZ, self.p_z[-1])
+
+
+        # ~ //density profile: (y) with sigma; (b) square
+        # ~ self.p_rh = np.array(nz)     # rho - density(z)
+        # ~ self.p_rL = np.array(nz)     # rho - density(layer)
+        # ~ stp   = np.array(nz)     # step profile
+
+        self.p_rh = np.array( [ L_rh[0] for i in range(nz) ] )
+        self.p_rL = np.array( [ L_rh[0] for i in range(nz) ] )
+
+        for i in range(nl-1):
+            # ~ stp = [ step0(L_dz[i],L_rh[i],L_rh[i+1], L_sg[i], z) for z in self.p_z]
+            stp = step(L_dz[i],L_rh[i],L_rh[i+1], L_sg[i], self.p_z)
+            self.p_rh = self.p_rh + stp
+            # ~ stp = [ step0(L_dz[i],L_rh[i],L_rh[i+1], 0.1,     z) for z in self.p_z ]
+            stp = step(L_dz[i],L_rh[i],L_rh[i+1], 0.1,     self.p_z)
+            self.p_rL = self.p_rL + stp
+
+    # ~ @timer
+    def layer_profile_comp(self):
+        # ~ print_(where())
+        na = len(self.atoms)    # no. of total atoms
+        nl = len(self.LL)       # no. of layers
+        nz = self.nz            # no. of pints on z axis
+        self.p_ac = []          # profile of atomic composition for each atom type
+        for ai in range(na):
+            p_ac = np.array(nz) # profile of atomic composition for atom #ai
+            ac_i = self.atomc[ai]
+            ac0 = ac_i[0]      # atomic comp for atom #ai in layer 0
+            p_ac = ac0
+            for L in range(nl-1):
+                pos = self.L_dz[L]
+                ac1 = ac_i[L]
+                ac2 = ac_i[L+1]
+                sgm = self.L_sg[L]
+                p_ac = p_ac + step( pos, ac1, ac2, sgm, self.p_z)
+            self.p_ac.append(p_ac)
+
+    # ~ @timer
+    def profile_SLD(self):
+        #profiles(z)
+        _re = _PhysConst()._re
+        _Na = _PhysConst()._Na
+        nz = len(self.p_z)
+        na = len(self.atoms)
+        self.p_Mm  = np.array(self.p_z)
+        self.p_Vm  = np.array(self.p_z)
+        self.p_ASF = np.array(self.p_z, dtype=np.complex_)     # for q=0
+        self.p_SLD = np.array(self.p_z, dtype=np.complex_)     # for q=0
+
+        self.p_Mm[:] = 0
+        self.p_Vm[:] = 0
+        self.p_ASF[:] = 0+0j
+        self.p_SLD[:] = 0+0j
+        for ai in range(na):
+            self.p_ac[ai] = np.abs(self.p_ac[ai])
+            ac = self.p_ac[ai]
+            asf = self.atomSF[ai]
+            amm = self.atomMm[ai]
+            self.p_Mm = self.p_Mm + ac*amm
+            self.p_ASF = self.p_ASF + ac*asf
+
+        self.p_rh = np.abs(self.p_rh)
+        self.p_Vm = self.p_Mm/self.p_rh/_Na*1.e24
+        self.p_SLD = _re*1.0E10*self.p_ASF/self.p_Vm
+        # ~ Vm_cm3 = Mm/rho/_Na                    #//(g/mol)/(g/cm^3)/(1/mol) = cm^3
+        # ~ Vm_A3  = Vm_cm3*1.0e24                  #//A^3
+        # ~ sld = _re*1.0E-14*asf*(_Na*rho/Mm)
+        # ~ sld = _re*1.0E-14*asf/Vm_cm3
+        # ~ sld = _re*1.0E-14*asf/Vm_A3*1.0E24
+
+    def profile_SLD_rho(self):
+        #profiles(z)
+        _re = _PhysConst()._re
+        _Na = _PhysConst()._Na
+        self.p_rh = np.abs(self.p_rh)
+        self.p_Vm = self.p_Mm/self.p_rh/_Na*1.e24
+        self.p_SLD = _re*1.0E10*self.p_ASF/self.p_Vm
+
+    # ~ @timer
+    def layer_profile(self):
+        ##################################
+        self.layer_atoms_ASF()
+        self.layer_profile_rho()
+        self.layer_profile_comp()
+
+
+    # ~ @timer
+    def xrr_profile(self):
+        self.profile_SLD_rho()
+
+        nz = len(self.p_z)
+        dz = self._pdz
+        nq = len(self.qq)
+        nf = nz -1
+        na = len(self.atoms)
+
+        # xrr
+        ################################
+        t   = np.array(self.qq, dtype=np.complex_)
+        K   = np.array(self.qq, dtype=np.complex_)  ;   K[:]    = 0.0 + 0j
+        K0  = np.array(self.qq, dtype=np.complex_)  ;   K0[:]   = 0.0 + 0j
+        F   = np.array(self.qq, dtype=np.complex_)  ;   F[:]    = 1.0 + 0j
+        R   = np.array(self.qq, dtype=np.complex_)  ;   R[:]    = 0.0 + 0j
+        R0  = np.array(self.qq, dtype=np.complex_)  ;   R0[:]   = 0.0 + 0j
+        Bt  = np.array(self.qq, dtype=np.complex_)  ;   Bt[:]   = 1.0 + 0j
+        DS  = np.array(self.qq, dtype=np.complex_)
+        R2  = np.array(self.qq)                     ;   R2[:]   = 0.0
+        Q2  = np.array(self.qq)
+        KK  = np.array(self.qq, dtype=np.complex_)
+
+
+        def sqrtc(cw):        # cmath.sqrt don't operate on arrays
+            return np.asarray( [ cmath.sqrt(cw[i]) for i in range(len(cw)) ] )
+
+        # ~ K = sqrt( Q**2/4 - 4*pi*(SLD[z] - SLD[nf]) )
+        Q2  = self.qq*self.qq/4.0
+        def K2(z):
+            DS[:] = 4.0*np.pi*(self.p_SLD[z]-self.p_SLD[nf])
+            return Q2-DS
+
+        K0 = sqrtc(K2(0))
+
+
+        sg0 = 1.0
+        R2z = []
+
+        for z in range(1, nz):
+            K = sqrtc( K2(z))
+            F = (K - K0)/(K + K0)     #Fresnel
+            # ~ Phi   = K * K0 * sg0 * sg0      #phase
+            # ~ Atn   = np.exp(-Phi)            #attenuation
+            # ~ FA    = F * Atn               #Fresnel w. attn.
+            FA = F
+            Bt = np.exp(-2.0*1j*K*dz) #betha
+            R  = Bt*(R0 + FA)/(1.0 + R0*FA)  #refl.
+            R2 = abs(R)**2                 #refl. int.
+            R2z.append(R2)
+            K0 = K
+            R0 = R
+
+        self.R2z = R2z
+        self.rr0 = R2       # refl. int in last outer layer
+        self.rr1 = abs(self._a0)*self.rr0+abs(self._b0)     # with scale and bgnd
+
+        self.r0q4 = self.qq4*self.rr0
+        self.r1q4 = self.qq4*self.rr1
+
+        return self.r1q4
+
+
+    ######################################################
+                # P R O F I L E    F I T T I N G #
+            #######################################
+
+    def prof_fitparam(self, pw):
+        dz = self.dz
+        print("a,b", [ f"{v:6.4f}" for v in pw[0:2] ])
+        print("rho", [ f"{v:6.4f}" for v in pw[2:2+dz] ])
+        # ~ n = 2+dz
+        # ~ for a in self.atoms:
+            # ~ print(a, [ f"{v:6.4f}" for v in pw[n:n+dz] ])
+            # ~ n += dz
+
+    def prof2parm(self):
+        z1, dz = self.z1, self.dz
+        na = len(self.atoms)
+        nn = dz+2 #+dz*na
+        self.pfit = np.asarray([float(0.0) for _ in range(nn)])
+
+        self.pfit[0] = self._a0
+        self.pfit[1] = self._b0
+        z0 = 2
+        self.pfit[z0:z0+dz] = [ float(v) for v in self.p_rh[z1:z1+dz] ]
+        # ~ z0 += dz
+        # ~ for ac, a in zip(self.p_ac, self.atoms):
+            # ~ self.pfit[z0:z0+dz] = [ float(v) for v in ac[z1:z1+dz] ]
+            # ~ z0 += dz
+        # ~ self.prof_fitparam(self.pfit)
+
+
+
+    def parm2prof(self, pw):
+        z1, dz = self.z1, self.dz
+        # ~ self.prof_fitparam(pw)
+        self._a0 = pw[0]
+        self._b0 = pw[1]
+        z0 = 2
+        self.p_rh[z1:z1+dz] = pw[z0:z0+dz]
+        # ~ z0 += dz
+        # ~ for ai in range(len(self.p_ac)):
+            # ~ self.p_ac[ai][z1:z1+dz] = pw[z0:z0+dz]
+            # ~ z0 += dz
+
+    def fit_profile_LM(self):
+        #######################################
+        def xrr_profile_LM(qq, *pw):    # ~ qq=4*pi*sin(tht)/wl
+            self.parm2prof(pw)          # ~ pw=fit parameter wave
+            self.r1q4 = self.xrr_profile()
+            self.fit_process()
+            return self.r1q4
+        ####################
+        print('fit Nonlinear Least-Squares ', self.fitkeys)
+        self.r1q4 = xrr_profile_LM(self.qq, *self.pfit)
+
+        # try using full_output
+        res =  scipy.optimize.curve_fit( xrr_profile_LM,
+            self.qq, self.yq4, p0 = self.pfit, full_output=1)
+
+        popt, pcov, infodict, errmsg, ier = res
+        print('\n errmsg =', errmsg)
+
+        # ~ !!! normal output fit
+        # ~ res =  scipy.optimize.curve_fit( xrr_profile_LM,
+            # ~ self.qq, self.yq4, p0 = self.pfit)
+        # ~ popt, pcov = res
+
+        self.popt, self.pcov = popt, pcov
+        self.perr = np.sqrt(np.diag(pcov))
+        print('perr = ', self.perr)
+        self.xrr_profile()
+    # ~ end def profile_fit_LM(self):
+
+    def fit_profile_DE(self):
+        self.fit_process(key=0, msg="fit profile DE not implemented")
+
+
+    def test_str(self):
+        # ~ print_(where())
         # ~ print('\t XRR.xrr_str()')
         self.layer_str = \
-"""# name , chem_comp , thickness_[A] , roughness_[A] , density_[g/cm^3] 
-glass    , Si;1;O;2           ,  0.00 ,  6.13 ,  3.5200 
-NoName   , Si;0.1;O;0.5;C;0.4 , 12.77 ,  3.43 ,  0.0030 
-W        , W;1                , 42.36 ,  3.87 , 20.1600 
-W-Si-O   , W;0.6;Si;0.3;O;0.1 ,  7.82 ,  3.90 , 10.1700 
-NoName   , Si;0.1;O;0.5;C;0.4 ,  7.47 ,  5.59 ,  0.0014 
-Si       , Si;1               , 62.96 , 35.62 ,  1.4800 
-SiO2     , Si;1;O;2           , 14.99 ,  4.82 ,  3.3600 
+"""# name , chem_comp , thickness_[A] , roughness_[A] , density_[g/cm^3]
+glass    , Si;1;O;2           ,  0.00 ,  6.13 ,  3.5200
+NoName   , Si;0.1;O;0.5;C;0.4 , 12.77 ,  3.43 ,  0.0030
+W        , W;1                , 42.36 ,  3.87 , 20.1600
+W-Si-O   , W;0.6;Si;0.3;O;0.1 ,  7.82 ,  3.90 , 10.1700
+NoName   , Si;0.1;O;0.5;C;0.4 ,  7.47 ,  5.59 ,  0.0014
+Si       , Si;1               , 62.96 , 35.62 ,  1.4800
+SiO2     , Si;1;O;2           , 14.99 ,  4.82 ,  3.3600
 air      , N;1.5;O;0.5        ,  0.00 ,  0.00 ,  0.0012"""
 
         self.data_str = \
@@ -2239,16 +2779,16 @@ air      , N;1.5;O;0.5        ,  0.00 ,  0.00 ,  0.0012"""
 	13.98	1.0942e-06
 	13.99	1.003014e-06
 	14	1.276537e-06"""
-        
 
 
 
-def blank_strip(string):
-    bstring = ""
-    for c in string:
-        if c not in (' ', '\t', '\n'):
-            bstring += c
-    return bstring
+
+# ~ def blank_strip(string):
+    # ~ bstring = ""
+    # ~ for c in string:
+        # ~ if c not in (' ', '\t', '\n'):
+            # ~ bstring += c
+    # ~ return bstring
 
 def peak_gauss(x, x0, w, A):    # w = FWHM
     # f(x=x0) = A
@@ -2257,12 +2797,12 @@ def peak_gauss(x, x0, w, A):    # w = FWHM
     # v = (w/2.0/np.sqrt(2.0*np.log(2.0))
     # return A*(np.exp((-0.5)*(((x-x0)/v)**2)))
     return A*np.exp(-2.0*np.log(2.0)*((x-x0)/w)**2)
-    
+
 def peak_func(x, *p):
-    y = 0.0; 
+    y = 0.0
     n = len(p)/3
-    if n != 0 : 
-        for i in range(n) : 
+    if n != 0 :
+        for i in range(n) :
             y += peak_gauss(x, *p[i*3:i*3+3])   # *p :== expand list p[0], p[1], p[2]
     return y
 
@@ -2272,7 +2812,7 @@ def val2idx(array, value):
     idx = (np.abs(array - value)).argmin()
     # ~ idx = array.index(value)
     return idx  #, array[idx]
-    
+
 
 class _MolarMass:
     MM, MZ, MS, MN = [], [], [], []
@@ -2377,7 +2917,7 @@ class _MolarMass:
             self.MZ.append(int(Z))
             self.MS.append(Symb)
             self.MN.append(Name)
-        
+
     def mm(self, atom):
         # ~ for i, s in enumerate(self.Symb):
             # ~ if s == atom:
@@ -2387,8 +2927,129 @@ class _MolarMass:
         # ~ print '_MolarMass.mm(',atom,')=', MM
         return MM
 
-    
-    
+
+
+
+class Amain():
+    def __init__(self):
+        Xrr = XRR()
+        Xrr._plot()
+        # ~ Xrr.data_load_gui(".dat")
+
+        Xrr.fitprof = 0    # 0=layer,  1=profile
+        Xrr.fitmode = 0    # 0=LM ,    1=DE
+        Xrr.fitmax = 1000
+        Xrr.update = 100
+        Xrr.fit_set_fitkeys()  #   d, rho, sigma, a0b0
+        Xrr.fit_start('console start and sleep(4)')
+        time.sleep(4)
+        Xrr.fit_stop('console stop')
+        Xrr.fit_wait()
+
+        Xrr.layer_print()
+
+        Xrr._pdz = 2
+        Xrr.layer_profile()
+
+        Xrr._plot()
+
+        Xrr.fitprof = 1    # 0=layer,  1=profile
+        Xrr.fit_start('')
+        time.sleep(4)
+        Xrr.fit_stop('console stop')
+        Xrr.fit_wait()
+
+        Xrr._plot()
+        input("exit")
+        exit()
+
+        import matplotlib.pyplot as plt
+        from mpl_toolkits.mplot3d import Axes3D
+        from matplotlib.collections import PolyCollection
+        from matplotlib import cm
+
+        Z = np.asarray(Xrr.p_z[1:]).copy()
+        Q = Xrr.qq.copy()
+        # ~ Q4= Xrr.qq4.copy()
+        # ~ print(Z.shape, Q.shape)
+        ZZ, QQ = np.meshgrid(Q, Z)
+        Q4 = QQ**4
+        # ~ print(ZZ.shape, QQ.shape, Q4.shape)
+        a0=Xrr._a0
+        b0=Xrr._b0
+        R = (np.asarray(Xrr.R2z)*a0+abs(b0))*Q4+1e-7
+        # ~ print(R.shape)
+
+        fig = plt.figure()
+        ax = fig.add_subplot(211)
+        for z in range(len(Z)):
+            ax.plot(Q, R[z])
+        ax.plot(Q, R[-1], c='k', linewidth=2)
+        ax.set_yscale('log')
+
+
+        ax = fig.add_subplot(212, projection='3d')
+        surf = ax.plot_surface(ZZ, QQ, np.log10(R),
+            cmap=cm.plasma,    # 'viridis', 'plasma', 'inferno', 'magma', 'cividis', 'jet', hsv
+            linewidth=1, antialiased=True)
+
+        import matplotlib.ticker as mticker
+        def log_tick_formatter(val, pos=None):
+            return "{:2.0E}".format(10**val)
+        ax.zaxis.set_major_formatter(mticker.FuncFormatter(log_tick_formatter))
+
+        import math
+        mn = math.floor( np.log10(R).min() )
+        mx = math.ceil(  np.log10(R).max() )
+        dn = int((mx-mn)//4.0)
+        if dn == 0 : dn +=1
+        # ~ print(mn, mx, dn)
+        zticks = [ 10.0**val for val in range(mn, mx, dn)]
+        ax.set_zticks(np.log10(zticks))
+        # ~ zticks = [1e-15, 1e-10, 1e-5, 1e-0, 1e+5, 1e+10]
+        # ~ ax.plot_surface(x, y, np.log10(z))
+        # ~ ax.set_zticklabels(zticks)
+        # ~ ax.set_zticks(np.log10(zticks))
+
+        ax.set_proj_type('ortho')
+        # ~ fig.colorbar(surf, shrink=0.5, aspect=5)
+        # ~ ax.auto_scale_xyz([0, 1400], [-10, 160], [-8, 1])
+
+        # ~ x_scale=1
+        # ~ y_scale=1
+        # ~ z_scale=1
+
+        # ~ ax.get_proj = lambda: np.dot(
+            # ~ Axes3D.get_proj(ax), np.diag([x_scale, y_scale, z_scale, 1]))
+
+
+        plt.show()
+
+        # ~ Xrr.plot()
+
+
+if __name__ == "__main__":
+    Amain()
+
+
+
+        # ~ ax = pg.figure.add_subplot(111)
+        # ~ ax = pg.figure.gca(projection = '3d')
+
+        # ~ axes = plt.gca()
+        # ~ axes.set_xlim([xmin,xmax])
+        # ~ axes.set_ylim([ymin,ymax])
+
+        # ~ ticks = np.arange(0., 8.1, 2.)
+        # ~ tickLb = ['%1.2f' % tick for tick in ticks] # list comprehension to get all tick labels...
+        # ~ ax1.xaxis.set_ticks(ticks)
+        # ~ ax2.xaxis.set_ticks(ticks)
+        # ~ ax2.xaxis.set_ticklabels(tickLb)
+        # ~ ax2.set_xlim(ax1.get_xlim())
+        # ~ plot(x, y, 'go--', linewidth=2, markersize=12)
+        # ~ plot(x, y, color='green', marker='o', linestyle='dashed', linewidth=2, markersize=12)
+
+
 def scipy_optimize_minimize_test(self):
     import pylab as pl
     def f(x,*p):
@@ -2405,18 +3066,19 @@ def scipy_optimize_minimize_test(self):
     # mean squared error wrt. noisy data as a function of the parameters
     x = self.qq
     err = lambda p: np.mean((f(x,*p)-y_noise)**2)
-    
+
     # bounded optimization using scipy.minimize
     p_init = [1., -1., .5, .5, 2.]
+    p_bounds = [(None,None),(-1,1),(None,None),(0,None),(None,None)]
     print(p_init)
     print(p_bounds)
     p_opt = scipy.optimize.minimize(
         err, # minimize wrt to the noisy data
-        p_init, 
+        p_init,
         bounds=p_bounds,     #[(None,None),(-1,1),(None,None),(0,None),(None,None)], # set the bounds
         method="L-BFGS-B" # this method supports bounds
     ).x
-    
+
     print(p_opt)
     # plot everything
     pl.scatter(x, y_noise, alpha=.2, label="f + noise")
@@ -2431,24 +3093,7 @@ def scipy_optimize_minimize_test(self):
 
     pl.show()
 
-def step_test():
-    n = 100
-    stepx = np.array(n)
-    stepy = np.array(n)
-    stepx = np.asarray( [-20. + x*50.0/n for x in range(n)] )
-    stepy = np.array([ 5 for sx in stepx])
-    stepy = stepy + step(-10., 5, 10., 3., stepx) 
-    stepy = stepy + step( 0., 10, 3, 3., stepx) 
-    stepy = stepy + step( 10., 3, 7, 3., stepx) 
-    stepy = stepy + step( 20., 7, 0, 3., stepx) 
 
-    fig, axs = plt.subplots(1)
-    axs.plot(stepx, stepy, label='step')
-    axs.grid(True)
-    plt.show()
-    
-    
-    
 def fit_lmfit_test(self):
     from lmfit import minimize, Parameters, Parameter, report_fit
     import numpy as np
@@ -2498,9 +3143,9 @@ def fit_lmfit_test(self):
         pylab.show()
     except:
         pass
-        
-def flatten(self):
-    
+
+def flatten(self, l):
+
     # ~ Given a list of lists l,
 
     flat_list = [item for sublist in l for item in sublist]
@@ -2526,24 +3171,24 @@ def flatten(self):
     # ~ 1000 loops, best of 3: 969 usec per loop
     # ~ $ python -mtimeit -s'l=[[1,2,3],[4,5,6], [7], [8,9]]*99' 'reduce(lambda x,y: x+y,l)'
     # ~ 1000 loops, best of 3: 1.1 msec per loop
-    
+
 def scipy_optimize_differential_evolution_test():
     '''
-    This is kinda straightforward solution which shows the idea, 
-    also code isn`t very pythonic but for simplicity i think its 
-    good enough. Ok as example we want to fit equation of a kind 
-    y = ax^2 + bx + c 
-    to a data obtained from equation 
-    y = x^2. 
-    It obvious that parameter a = 1 and b,c should equal to 0. 
-    Since differential evolution algorithm finds minimum of a 
-    function we want to find a minimum of a root mean square deviation 
-    (again, for simplicity) of analytic solution of general equation 
-    (y = ax^2 + bx + c) with given parameters (providing some initial 
+    This is kinda straightforward solution which shows the idea,
+    also code isn`t very pythonic but for simplicity i think its
+    good enough. Ok as example we want to fit equation of a kind
+    y = ax^2 + bx + c
+    to a data obtained from equation
+    y = x^2.
+    It obvious that parameter a = 1 and b,c should equal to 0.
+    Since differential evolution algorithm finds minimum of a
+    function we want to find a minimum of a root mean square deviation
+    (again, for simplicity) of analytic solution of general equation
+    (y = ax^2 + bx + c) with given parameters (providing some initial
     guess) vs "experimental" data. So, to the code:
     '''
-    
-        
+
+
     from scipy.optimize import differential_evolution
     def func(parameters, *data):
         #we have 3 parameters which will be passed as parameters and
@@ -2558,25 +3203,10 @@ def scipy_optimize_differential_evolution_test():
     #initial guess for variation of parameters
     #             a            b            c
     bounds = [(1.5, 0.5), (-0.3, 0.3), (0.1, -0.1)]
-    #producing "experimental" data 
+    #producing "experimental" data
     x = [i for i in range(100)]
     y = [v**2 for v in x]
     #packing "experimental" data into args
     args = (x,y)
     result = differential_evolution(func, bounds, args=args)
     print(result.x)
-    
-    
-if __name__ == "__main__":
-   
-    Xrr = XRR()
-    Xrr.fitmax = 100
-    Xrr.fit()
-    Xrr.layer_print()
-    Xrr.layer_profile()
-    Xrr.fitmax = 0
-    Xrr.plot()
-    
-    
-   
-    
