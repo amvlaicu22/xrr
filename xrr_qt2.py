@@ -28,7 +28,7 @@ from matplotlib.backends.backend_qt5agg import FigureCanvasQTAgg as FigureCanvas
 from matplotlib.figure import Figure
 import matplotlib.pyplot as plt
 
-from xrr import XRR, _XLayer
+from XRR import XRR, _XLayer
 # ~ from where import *
 # ~ from functools import wraps
 
@@ -130,7 +130,7 @@ class MainFrame(QMainWindow, XRR):
 
     def __init__(self):
         super(MainFrame, self).__init__()
-        uic.loadUi('xrr_qtdesigner.ui', self)
+        uic.loadUi('xrr_qt2gui.ui', self)
         self.show()
         # ~ self.B_Fit_Start = self.findChild(QtWidgets.QPushButton, 'B_Fit_Start')
         self.B_Fit_Start.   released.connect(self.OnButton_B_Fit_Start) 
@@ -187,7 +187,7 @@ class MainFrame(QMainWindow, XRR):
         self.print_(text)
         self.print_color(0,0,0)
         
-    def _plot(self):
+    def _plot_init(self):
         # ~ self.plot_anchx = 1.02
         # ~ self.plot_anchy = 1.1
         # ~ self.plot_drag = True
@@ -200,8 +200,8 @@ class MainFrame(QMainWindow, XRR):
             p3 = Panel_Plot(self.Panel3_Error, row=1, col=1, 
                 fplots=[self._plot_err])
             self.plot_plots = [p1, p2, p3]
-        # ~~~~
-        for p in self.plot_plots: p.plot()
+        # ~ # ~~~~
+        # ~ for p in self.plot_plots: p.plot()
 
        
     def fit_prestart(self, event):  # wxGlade: XRR_Frame.<event_handler>
@@ -256,17 +256,20 @@ class MainFrame(QMainWindow, XRR):
         self.B_Fit_N.setText(str(self.fitn))
         
     def fit_upd(self, event):
-        XRR.fit_upd(self, event)
-        if self.fitprof == 0:
+        # ~ XRR.fit_upd(self, event)
+        print( f'\nxrr>>: update {event.data}', flush=True)
+        if not self.fitprof :   # layer
             self.layer_profile()
         self.layer_to_grid()
         self._plot()
 
         
     def fit_end(self, event):
-        XRR.fit_end(self, event)
+        print( f'\nxrr>>: finish {event.data}', flush=True)
+        self.fit_worker = None
         self.B_Fit_Start.setEnabled(True)
-        self.fit_upd(event)
+        self.layer_to_grid()
+        self._plot()
         
  
     

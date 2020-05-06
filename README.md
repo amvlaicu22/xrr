@@ -25,7 +25,8 @@ https://opensource.org/licenses/GPL-2.0)
 * see the local [LICENSE](./LICENSE) file for details
 
 #### Acknowledgments
-* Cromer-Liberman code for Igor Pro ver. 4.0 and higher, translated from original Fortran code by **Jan Ilavsky**, 9/18/2006:
+* Cromer-Liberman code for Igor Pro ver. 4.0 and higher,
+	* translated from original Fortran code by **Jan Ilavsky**, 9/18/2006:
 	* [https://usaxs.xray.aps.anl.gov/software/cromer-liberman](
 	https://usaxs.xray.aps.anl.gov/software/cromer-liberman)
 
@@ -36,10 +37,9 @@ https://opensource.org/licenses/GPL-2.0)
 * package manager [pip](https://pip.pypa.io/en/stable/)
 * [numpy](https://pypi.org/project/numpy/)
 * [scipy](https://pypi.org/project/scipy/)
-* [mpmath](https://pypi.org/project/mpmath/) for the **erf** function
 * [matplotlib](https://pypi.org/project/matplotlib/)
 ```
-sudo -H pip3 install numpy scipy mpmath matplotlib
+sudo -H pip3 install numpy scipy matplotlib
 ```
 For Graphical User Interface
 * [wxPython](https://pypi.org/project/wxPython/), [PyQt5](https://pypi.org/project/PyQt5/) 
@@ -60,8 +60,9 @@ pip3 install -i https://test.pypi.org/simple/ --no-deps xrr-amvlaicu22
 [https://github.com/amvlaicu22/xrr](
 https://github.com/amvlaicu22/xrr)
 ##### Files
-* xrr.py 	: console program
+* XRR.py 	: X-Ray Reflectivity module 
 * CromerLiberman.py : atomic scattering factors 
+* xrr_cl2.py : console test example
 * xrr_wx2.py 	: wx interface 
 * xrr_wx2gui.py	: wxglade generated GUI 
 * xrr_wx2gui.wxg : wxglade file for GUI 
@@ -71,7 +72,7 @@ https://github.com/amvlaicu22/xrr)
 
 ##### Running
 ```bash
-python3 xrr.py
+python3 xrr_cl2.py
 python3 xrr_wx2.py
 python3 xrr_qt2.py
     

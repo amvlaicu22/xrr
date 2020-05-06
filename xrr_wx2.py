@@ -17,7 +17,7 @@ from matplotlib.backends.backend_wxagg import NavigationToolbar2WxAgg as Navigat
 
 from mpl_toolkits.mplot3d import Axes3D
 
-from xrr import XRR, _XLayer
+from XRR import XRR     #, _XLayer
 from xrr_wx2gui import XRR_Frame
 # ~ from xrr_wx2xrc import xrc_MainFrame
 
@@ -207,7 +207,8 @@ class MainFrame( XRR_Frame, XRR):
 
 
     def fit_upd(self, event):  # wxGlade: XRR_Frame.<event_handler>
-        XRR.fit_upd(self, event)
+        # ~ XRR.fit_upd(self, event)
+        print( f'\nxrr>>: update {event.data}', flush=True)
         if self.fitprof == 0:
             self.layer_profile()
         self.layer_to_grid()
@@ -220,7 +221,9 @@ class MainFrame( XRR_Frame, XRR):
 
         
     def fit_end(self, event):  # wxGlade: XRR_Frame.<event_handler>
-        XRR.fit_end(self, event)
+        # ~ XRR.fit_end(self, event)
+        print( f'\nxrr>>: finish {event.data}', flush=True)
+        self.fit_worker = None
         self.B_Fit_Start.Enable()
         self.fit_upd(event)
 
@@ -267,7 +270,7 @@ class MainFrame( XRR_Frame, XRR):
         
     ################################################################
     
-    def _plot(self):
+    def _plot_init(self):
         # ~ self.plot_anchx = 1.02
         # ~ self.plot_anchy = 1.1
         # ~ self.plot_drag = True
@@ -281,7 +284,7 @@ class MainFrame( XRR_Frame, XRR):
                 fplots=[self._plot_err])
             self.plot_plots = [p1, p2, p3]
         # ~ else:
-        for p in self.plot_plots: p.plot()
+        # ~ for p in self.plot_plots: p.plot()
         
     def layer_to_grid(self):
         # ~ print_(where())
