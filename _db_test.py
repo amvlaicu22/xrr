@@ -6,7 +6,7 @@ from _db_ import *
 def elapsed_timer_test():
     with Etimer() as elapsed:
         print("test elapsed_timer")
-        print("\twith elapsed_timer() as elapsed:\n\t ... print(elapsed())")
+        print("\twith Etimer() as elapsed:\n\t ... print(elapsed())")
         time.sleep(0.1)
         print(elapsed())
         time.sleep(0.1)
